@@ -1,5 +1,7 @@
 package com.eventsphere.eventsphere_backend.user.entity;
 
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,8 +32,10 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    @CreationTimestamp
     private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     private LocalDateTime updatedAt;
 
 }
