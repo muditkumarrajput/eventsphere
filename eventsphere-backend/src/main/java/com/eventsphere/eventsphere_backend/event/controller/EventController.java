@@ -2,7 +2,10 @@ package com.eventsphere.eventsphere_backend.event.controller;
 
 import com.eventsphere.eventsphere_backend.event.dto.CreateEventRequest;
 import com.eventsphere.eventsphere_backend.event.dto.EventResponse;
+import com.eventsphere.eventsphere_backend.event.dto.UpdateEventRequest;
 import com.eventsphere.eventsphere_backend.event.service.EventService;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,7 +22,7 @@ public class EventController {
 
     // Create Event
     @PostMapping
-    public EventResponse createEvent(@RequestBody CreateEventRequest request) {
+    public EventResponse createEvent(@Valid @RequestBody CreateEventRequest request) {
         return eventService.createEvent(request);
     }
 
@@ -33,5 +36,23 @@ public class EventController {
     @GetMapping("/{id}")
     public EventResponse getEventById(@PathVariable Long id) {
         return eventService.getEventById(id);
+    }
+
+    // Update Event
+    @PutMapping("/{id}")
+    public EventResponse updateEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateEventRequest request) {
+
+        return eventService.updateEvent(id, request);
+    }
+
+    // Delete Event
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
+
+        eventService.deleteEvent(id);
+
+        return ResponseEntity.noContent().build();
     }
 }
