@@ -27,6 +27,39 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
+
+    // Booking Not Found Exception
+    @ExceptionHandler(BookingNotFoundException.class)
+    public ErrorResponse handleBookingNotFoundException(
+            BookingNotFoundException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
+
+    // Event Capacity Exceeded Exception
+    @ExceptionHandler(EventCapacityExceededException.class)
+    public ErrorResponse handleEventCapacityExceededException(
+            EventCapacityExceededException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
+
     // Validation Exception
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ErrorResponse handleValidationException(
@@ -45,6 +78,7 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .build();
     }
+
 
     // Generic Exception
     @ExceptionHandler(Exception.class)
