@@ -3,6 +3,7 @@ package com.eventsphere.eventsphere_backend.common.exception;
 import com.eventsphere.eventsphere_backend.common.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,7 +28,6 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-
     // Booking Not Found Exception
     @ExceptionHandler(BookingNotFoundException.class)
     public ErrorResponse handleBookingNotFoundException(
@@ -43,7 +43,6 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-
     // Event Capacity Exceeded Exception
     @ExceptionHandler(EventCapacityExceededException.class)
     public ErrorResponse handleEventCapacityExceededException(
@@ -58,7 +57,6 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .build();
     }
-
 
     // Validation Exception
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -79,6 +77,20 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
+    // Authorization Denied Exception
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ErrorResponse handleAuthorizationDeniedException(
+            AuthorizationDeniedException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+                .message("Access Denied")
+                .path(request.getRequestURI())
+                .build();
+    }
 
     // Generic Exception
     @ExceptionHandler(Exception.class)

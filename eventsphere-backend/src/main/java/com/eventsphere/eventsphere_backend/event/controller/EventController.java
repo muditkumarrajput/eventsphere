@@ -6,6 +6,7 @@ import com.eventsphere.eventsphere_backend.event.dto.UpdateEventRequest;
 import com.eventsphere.eventsphere_backend.event.service.EventService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,7 +23,10 @@ public class EventController {
 
     // Create Event
     @PostMapping
-    public EventResponse createEvent(@Valid @RequestBody CreateEventRequest request) {
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    public EventResponse createEvent(
+            @Valid @RequestBody CreateEventRequest request) {
+
         return eventService.createEvent(request);
     }
 
@@ -40,6 +44,7 @@ public class EventController {
 
     // Update Event
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
     public EventResponse updateEvent(
             @PathVariable Long id,
             @Valid @RequestBody UpdateEventRequest request) {
@@ -49,6 +54,7 @@ public class EventController {
 
     // Delete Event
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
 
         eventService.deleteEvent(id);
