@@ -1,37 +1,55 @@
 package com.eventsphere.eventsphere_backend.user.service;
 
+import com.eventsphere.eventsphere_backend.user.dto.UserResponse;
 import com.eventsphere.eventsphere_backend.user.entity.User;
+import com.eventsphere.eventsphere_backend.user.mapper.UserMapper;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
-
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository,
+                       UserMapper userMapper) {
         this.userRepository = userRepository;
+        this.userMapper = userMapper;
     }
-
 
     public User createUser(User user) {
         return userRepository.save(user);
     }
 
+    public List<UserResponse> getAllUsers() {
 
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+        return userRepository.findAll()
+                .stream()
+                .map(userMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
+    public UserResponse getCurrentUser(String email) {
 
-    public User getUserById(Long id) {
-        return userRepository.findById(id)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return userMapper.toResponse(user);
     }
-    public User updateUser(Long id, User updatedUser) {
+
+    public UserResponse getUserById(Long id) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return userMapper.toResponse(user);
+    }
+
+    public UserResponse updateUser(Long id, User updatedUser) {
 
         User existingUser = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -42,8 +60,11 @@ public class UserService {
         existingUser.setPhoneNumber(updatedUser.getPhoneNumber());
         existingUser.setRole(updatedUser.getRole());
 
-        return userRepository.save(existingUser);
+        User savedUser = userRepository.save(existingUser);
+
+        return userMapper.toResponse(savedUser);
     }
+
     public void deleteUser(Long id) {
 
         User user = userRepository.findById(id)
@@ -51,5 +72,4 @@ public class UserService {
 
         userRepository.delete(user);
     }
-
 }
