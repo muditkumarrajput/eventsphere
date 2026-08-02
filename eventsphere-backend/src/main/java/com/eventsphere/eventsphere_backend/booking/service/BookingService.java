@@ -42,29 +42,31 @@ public class BookingService {
         this.eventRepository = eventRepository;
         this.bookingMapper = bookingMapper;
     }
+    public BookingResponse createBooking(
+            CreateBookingRequest request,
+            String email) {
 
-    public BookingResponse createBooking(CreateBookingRequest request) {
-
-        User user = userRepository.findById(request.getUserId())
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() ->
-                        new UserNotFoundException(request.getUserId()));
+                        new UserNotFoundException(email));
 
         Event event = eventRepository.findById(request.getEventId())
                 .orElseThrow(() ->
                         new EventNotFoundException(request.getEventId()));
 
-// Calculate booked and available seats
+        // Calculate booked and available seats
         Integer bookedTickets = bookingRepository.getBookedTickets(event.getId());
 
         int availableSeats = event.getCapacity() - bookedTickets;
 
-// Validate requested tickets
+        // Validate requested tickets
         if (request.getNumberOfTickets() > availableSeats) {
             throw new EventCapacityExceededException();
         }
 
         BigDecimal totalAmount = event.getTicketPrice()
                 .multiply(BigDecimal.valueOf(request.getNumberOfTickets()));
+
         Booking booking = Booking.builder()
                 .bookingReference(generateBookingReference())
                 .numberOfTickets(request.getNumberOfTickets())
@@ -79,7 +81,6 @@ public class BookingService {
 
         return bookingMapper.toResponse(savedBooking);
     }
-
     public List<BookingResponse> getAllBookings() {
 
         return bookingRepository.findAllByOrderByCreatedAtDesc()

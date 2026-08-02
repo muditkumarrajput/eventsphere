@@ -4,8 +4,11 @@ import com.eventsphere.eventsphere_backend.booking.dto.BookingResponse;
 import com.eventsphere.eventsphere_backend.booking.dto.CreateBookingRequest;
 import com.eventsphere.eventsphere_backend.booking.service.BookingService;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
@@ -18,26 +21,27 @@ public class BookingController {
 
     @PostMapping
     public BookingResponse createBooking(
-            @Valid @RequestBody CreateBookingRequest request) {
+            @Valid @RequestBody CreateBookingRequest request,
+            Authentication authentication) {
 
-        return bookingService.createBooking(request);
+        return bookingService.createBooking(
+                request,
+                authentication.getName()
+        );
     }
 
     @GetMapping
     public List<BookingResponse> getAllBookings() {
-
         return bookingService.getAllBookings();
     }
 
     @GetMapping("/{id}")
     public BookingResponse getBookingById(@PathVariable Long id) {
-
         return bookingService.getBookingById(id);
     }
+
     @DeleteMapping("/{id}")
     public void cancelBooking(@PathVariable Long id) {
-
         bookingService.cancelBooking(id);
-
     }
 }

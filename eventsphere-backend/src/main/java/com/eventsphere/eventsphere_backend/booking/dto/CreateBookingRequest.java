@@ -11,9 +11,6 @@ import lombok.*;
 @Builder
 public class CreateBookingRequest {
 
-    @NotNull(message = "User id is required")
-    private Long userId;
-
     @NotNull(message = "Event id is required")
     private Long eventId;
 
