@@ -106,4 +106,18 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .build();
     }
+    // Event Ownership Exception
+    @ExceptionHandler(EventOwnershipException.class)
+    public ErrorResponse handleEventOwnershipException(
+            EventOwnershipException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
 }

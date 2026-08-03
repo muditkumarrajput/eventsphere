@@ -1,6 +1,7 @@
 package com.eventsphere.eventsphere_backend.event.entity;
 
 import com.eventsphere.eventsphere_backend.booking.entity.Booking;
+import com.eventsphere.eventsphere_backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -45,6 +46,10 @@ public class Event {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EventCategory category;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
 
     @OneToMany(
             mappedBy = "event",
