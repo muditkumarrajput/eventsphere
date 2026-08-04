@@ -7,13 +7,30 @@ import com.eventsphere.eventsphere_backend.event.dto.CreateEventRequest;
 import com.eventsphere.eventsphere_backend.event.dto.EventResponse;
 import com.eventsphere.eventsphere_backend.event.dto.UpdateEventRequest;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
+import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
 import com.eventsphere.eventsphere_backend.event.mapper.EventMapper;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
+import com.eventsphere.eventsphere_backend.event.specification.EventSpecification;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,7 +51,10 @@ public class EventService {
         this.eventMapper = eventMapper;
     }
 
-    // Create Event
+    // =========================================================
+    // CREATE EVENT
+    // =========================================================
+
     public EventResponse createEvent(
             CreateEventRequest request,
             String email) {
@@ -45,6 +65,7 @@ public class EventService {
 
         Event event = eventMapper.toEntity(request);
 
+        // Store the user who created the event
         event.setCreatedBy(organizer);
 
         Event savedEvent = eventRepository.save(event);
@@ -52,7 +73,10 @@ public class EventService {
         return eventMapper.toResponse(savedEvent);
     }
 
-    // Get All Events
+    // =========================================================
+    // GET ALL EVENTS
+    // =========================================================
+
     public List<EventResponse> getAllEvents() {
 
         return eventRepository.findAll()
@@ -61,7 +85,10 @@ public class EventService {
                 .collect(Collectors.toList());
     }
 
-    // Get My Events
+    // =========================================================
+    // GET MY EVENTS
+    // =========================================================
+
     public List<EventResponse> getMyEvents(String email) {
 
         User organizer = userRepository.findByEmail(email)
@@ -74,7 +101,10 @@ public class EventService {
                 .collect(Collectors.toList());
     }
 
-    // Get Event By Id
+    // =========================================================
+    // GET EVENT BY ID
+    // =========================================================
+
     public EventResponse getEventById(Long id) {
 
         Event event = eventRepository.findById(id)
@@ -84,20 +114,24 @@ public class EventService {
         return eventMapper.toResponse(event);
     }
 
-    // Update Event
+    // =========================================================
+    // UPDATE EVENT
+    // =========================================================
+
     public EventResponse updateEvent(
             Long id,
             UpdateEventRequest request,
             String email) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new UserNotFoundException(email));
-
         Event event = eventRepository.findById(id)
                 .orElseThrow(() ->
                         new EventNotFoundException(id));
 
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(email));
+
+        // Check whether the user is allowed to modify this event
         validateOwnership(event, user);
 
         event.setTitle(request.getTitle());
@@ -113,31 +147,179 @@ public class EventService {
         return eventMapper.toResponse(updatedEvent);
     }
 
-    // Delete Event
-    public void deleteEvent(Long id, String email) {
+    // =========================================================
+    // DELETE EVENT
+    // =========================================================
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new UserNotFoundException(email));
+    public void deleteEvent(
+            Long id,
+            String email) {
 
         Event event = eventRepository.findById(id)
                 .orElseThrow(() ->
                         new EventNotFoundException(id));
 
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(email));
+
+        // Check ownership before deletion
         validateOwnership(event, user);
 
         eventRepository.delete(event);
     }
 
-    // Ownership Validation
-    private void validateOwnership(Event event, User user) {
+    // =========================================================
+    // SEARCH EVENTS
+    // =========================================================
 
+    public List<EventResponse> searchEvents(String keyword) {
+
+        return eventRepository
+                .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                        keyword,
+                        keyword
+                )
+                .stream()
+                .map(eventMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =========================================================
+    // FILTER BY CATEGORY
+    // =========================================================
+
+    public List<EventResponse> getEventsByCategory(
+            EventCategory category) {
+
+        return eventRepository.findByCategory(category)
+                .stream()
+                .map(eventMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =========================================================
+    // FILTER BY LOCATION
+    // =========================================================
+
+    public List<EventResponse> getEventsByLocation(
+            String location) {
+
+        return eventRepository
+                .findByLocationContainingIgnoreCase(location)
+                .stream()
+                .map(eventMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =========================================================
+    // FILTER BY DATE
+    // =========================================================
+
+    public List<EventResponse> getEventsByDate(
+            LocalDate date) {
+
+        LocalDateTime start = date.atStartOfDay();
+
+        LocalDateTime end = date.atTime(LocalTime.MAX);
+
+        return eventRepository
+                .findByEventDateBetween(start, end)
+                .stream()
+                .map(eventMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =========================================================
+    // FILTER BY PRICE RANGE
+    // =========================================================
+
+    public List<EventResponse> getEventsByPriceRange(
+            BigDecimal minPrice,
+            BigDecimal maxPrice) {
+
+        return eventRepository
+                .findByTicketPriceBetween(
+                        minPrice,
+                        maxPrice
+                )
+                .stream()
+                .map(eventMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =========================================================
+    // UPCOMING EVENTS
+    // =========================================================
+
+    public List<EventResponse> getUpcomingEvents() {
+
+        return eventRepository
+                .findByEventDateAfterOrderByEventDateAsc(
+                        LocalDateTime.now()
+                )
+                .stream()
+                .map(eventMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =========================================================
+    // PAGINATION + SORTING
+    // =========================================================
+
+    public Page<EventResponse> getEvents(
+            Pageable pageable) {
+
+        return eventRepository
+                .findAll(pageable)
+                .map(eventMapper::toResponse);
+    }
+
+    // =========================================================
+    // OWNERSHIP VALIDATION
+    // =========================================================
+
+    private void validateOwnership(
+            Event event,
+            User user) {
+
+        // ADMIN can modify any event
         if (user.getRole() == Role.ADMIN) {
             return;
         }
 
-        if (!event.getCreatedBy().getId().equals(user.getId())) {
+        // ORGANIZER can modify only their own events
+        if (event.getCreatedBy() == null ||
+                !event.getCreatedBy()
+                        .getId()
+                        .equals(user.getId())) {
+
             throw new EventOwnershipException();
         }
+    }
+
+    public Page<EventResponse> filterEvents(
+            String keyword,
+            EventCategory category,
+            String location,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            Pageable pageable) {
+
+        Specification<Event> specification = Specification.allOf(
+                EventSpecification.keywordContains(keyword),
+                EventSpecification.hasCategory(category),
+                EventSpecification.hasLocation(location),
+                EventSpecification.priceGreaterThanOrEqual(minPrice),
+                EventSpecification.priceLessThanOrEqual(maxPrice),
+                EventSpecification.eventDateAfter(startDate),
+                EventSpecification.eventDateBefore(endDate)
+        );
+
+        return eventRepository
+                .findAll(specification, pageable)
+                .map(eventMapper::toResponse);
     }
 }
