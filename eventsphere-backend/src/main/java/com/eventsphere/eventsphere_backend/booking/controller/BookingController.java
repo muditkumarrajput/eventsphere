@@ -35,13 +35,34 @@ public class BookingController {
         return bookingService.getAllBookings();
     }
 
+    @GetMapping("/my")
+    public List<BookingResponse> getMyBookings(
+            Authentication authentication) {
+
+        return bookingService.getMyBookings(
+                authentication.getName()
+        );
+    }
+
     @GetMapping("/{id}")
-    public BookingResponse getBookingById(@PathVariable Long id) {
-        return bookingService.getBookingById(id);
+    public BookingResponse getBookingById(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return bookingService.getBookingById(
+                id,
+                authentication.getName()
+        );
     }
 
     @DeleteMapping("/{id}")
-    public void cancelBooking(@PathVariable Long id) {
-        bookingService.cancelBooking(id);
+    public void cancelBooking(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        bookingService.cancelBooking(
+                id,
+                authentication.getName()
+        );
     }
 }

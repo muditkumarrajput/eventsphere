@@ -1,6 +1,7 @@
 package com.eventsphere.eventsphere_backend.booking.repository;
 
 import com.eventsphere.eventsphere_backend.booking.entity.Booking;
+import com.eventsphere.eventsphere_backend.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -21,4 +22,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findAllByOrderByCreatedAtDesc();
 
+    List<Booking> findByUserOrderByCreatedAtDesc(User user);
 }

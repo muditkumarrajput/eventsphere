@@ -1,27 +1,23 @@
 package com.eventsphere.eventsphere_backend.booking.service;
 
-import com.eventsphere.eventsphere_backend.common.exception.BookingNotFoundException;
-import com.eventsphere.eventsphere_backend.common.exception.BookingNotFoundException;
 import com.eventsphere.eventsphere_backend.booking.dto.BookingResponse;
 import com.eventsphere.eventsphere_backend.booking.dto.CreateBookingRequest;
 import com.eventsphere.eventsphere_backend.booking.entity.Booking;
 import com.eventsphere.eventsphere_backend.booking.entity.BookingStatus;
 import com.eventsphere.eventsphere_backend.booking.mapper.BookingMapper;
 import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
-import com.eventsphere.eventsphere_backend.common.exception.EventCapacityExceededException;
-import com.eventsphere.eventsphere_backend.common.exception.EventNotFoundException;
-import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
+import com.eventsphere.eventsphere_backend.common.exception.*;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.stream.Collectors;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class BookingService {
@@ -42,6 +38,8 @@ public class BookingService {
         this.eventRepository = eventRepository;
         this.bookingMapper = bookingMapper;
     }
+
+    // Create Booking
     public BookingResponse createBooking(
             CreateBookingRequest request,
             String email) {
@@ -81,6 +79,8 @@ public class BookingService {
 
         return bookingMapper.toResponse(savedBooking);
     }
+
+    // Get All Bookings
     public List<BookingResponse> getAllBookings() {
 
         return bookingRepository.findAllByOrderByCreatedAtDesc()
@@ -88,24 +88,70 @@ public class BookingService {
                 .map(bookingMapper::toResponse)
                 .collect(Collectors.toList());
     }
-    public BookingResponse getBookingById(Long id) {
+
+    // Get My Bookings
+    public List<BookingResponse> getMyBookings(String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(email));
+
+        return bookingRepository.findByUserOrderByCreatedAtDesc(user)
+                .stream()
+                .map(bookingMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // Get Booking By ID
+    public BookingResponse getBookingById(
+            Long id,
+            String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(email));
 
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() ->
                         new BookingNotFoundException(id));
+
+        // Check booking ownership
+        if (!booking.getUser().getId().equals(user.getId())) {
+            throw new BookingNotFoundException(id);
+        }
 
         return bookingMapper.toResponse(booking);
     }
-    public void cancelBooking(Long id) {
+
+    // Cancel Booking
+    public void cancelBooking(
+            Long id,
+            String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(email));
 
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() ->
                         new BookingNotFoundException(id));
+
+        // Check booking ownership
+        if (!booking.getUser().getId().equals(user.getId())) {
+            throw new BookingNotFoundException(id);
+        }
+
+        // Prevent cancelling an already cancelled booking
+        if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
+            throw new BookingAlreadyCancelledException(id);
+        }
 
         booking.setBookingStatus(BookingStatus.CANCELLED);
 
         bookingRepository.save(booking);
     }
+
+    // Generate Booking Reference
     private String generateBookingReference() {
 
         return "EVT-" +
