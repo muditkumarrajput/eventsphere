@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
-
+import com.eventsphere.eventsphere_backend.common.exception.ReviewNotFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -28,6 +28,21 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
+    // Review Ownership Exception
+    @ExceptionHandler(ReviewOwnershipException.class)
+    public ErrorResponse handleReviewOwnershipException(
+            ReviewOwnershipException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
     // Booking Not Found Exception
     @ExceptionHandler(BookingNotFoundException.class)
     public ErrorResponse handleBookingNotFoundException(
@@ -38,6 +53,36 @@ public class GlobalExceptionHandler {
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.NOT_FOUND.value())
                 .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
+    // Booking Already Cancelled Exception
+    @ExceptionHandler(BookingAlreadyCancelledException.class)
+    public ErrorResponse handleBookingAlreadyCancelledException(
+            BookingAlreadyCancelledException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
+    // Review Already Exists Exception
+    @ExceptionHandler(ReviewAlreadyExistsException.class)
+    public ErrorResponse handleReviewAlreadyExistsException(
+            ReviewAlreadyExistsException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
                 .message(ex.getMessage())
                 .path(request.getRequestURI())
                 .build();
@@ -106,18 +151,20 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .build();
     }
-    // Event Ownership Exception
-    @ExceptionHandler(EventOwnershipException.class)
-    public ErrorResponse handleEventOwnershipException(
-            EventOwnershipException ex,
+
+    // Review Not Found Exception
+    @ExceptionHandler(ReviewNotFoundException.class)
+    public ErrorResponse handleReviewNotFoundException(
+            ReviewNotFoundException ex,
             HttpServletRequest request) {
 
         return ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
-                .status(HttpStatus.FORBIDDEN.value())
-                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
                 .message(ex.getMessage())
                 .path(request.getRequestURI())
                 .build();
     }
+
 }
