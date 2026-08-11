@@ -1,6 +1,5 @@
 package com.eventsphere.eventsphere_backend.common.exception;
 
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import com.eventsphere.eventsphere_backend.common.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -8,9 +7,10 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
-import com.eventsphere.eventsphere_backend.common.exception.ReviewNotFoundException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -96,6 +96,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ReviewAlreadyExistsException.class)
     public ErrorResponse handleReviewAlreadyExistsException(
             ReviewAlreadyExistsException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
+    // Payment Already Exists Exception
+    @ExceptionHandler(PaymentAlreadyExistsException.class)
+    public ErrorResponse handlePaymentAlreadyExistsException(
+            PaymentAlreadyExistsException ex,
             HttpServletRequest request) {
 
         return ErrorResponse.builder()
@@ -201,4 +216,18 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
+    // Payment Not Found Exception
+    @ExceptionHandler(PaymentNotFoundException.class)
+    public ErrorResponse handlePaymentNotFoundException(
+            PaymentNotFoundException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
 }
