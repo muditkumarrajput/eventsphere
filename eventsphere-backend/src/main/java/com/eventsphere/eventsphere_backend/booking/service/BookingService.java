@@ -9,6 +9,7 @@ import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
 import com.eventsphere.eventsphere_backend.common.exception.*;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
+import com.eventsphere.eventsphere_backend.notification.service.NotificationService;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -26,17 +27,20 @@ public class BookingService {
     private final UserRepository userRepository;
     private final EventRepository eventRepository;
     private final BookingMapper bookingMapper;
+    private final NotificationService notificationService;
 
     public BookingService(
             BookingRepository bookingRepository,
             UserRepository userRepository,
             EventRepository eventRepository,
-            BookingMapper bookingMapper) {
+            BookingMapper bookingMapper,
+            NotificationService notificationService) {
 
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.eventRepository = eventRepository;
         this.bookingMapper = bookingMapper;
+        this.notificationService = notificationService;
     }
 
     // Create Booking
@@ -53,9 +57,11 @@ public class BookingService {
                         new EventNotFoundException(request.getEventId()));
 
         // Calculate booked and available seats
-        Integer bookedTickets = bookingRepository.getBookedTickets(event.getId());
+        Integer bookedTickets =
+                bookingRepository.getBookedTickets(event.getId());
 
-        int availableSeats = event.getCapacity() - bookedTickets;
+        int availableSeats =
+                event.getCapacity() - bookedTickets;
 
         // Validate requested tickets
         if (request.getNumberOfTickets() > availableSeats) {
@@ -63,7 +69,11 @@ public class BookingService {
         }
 
         BigDecimal totalAmount = event.getTicketPrice()
-                .multiply(BigDecimal.valueOf(request.getNumberOfTickets()));
+                .multiply(
+                        BigDecimal.valueOf(
+                                request.getNumberOfTickets()
+                        )
+                );
 
         Booking booking = Booking.builder()
                 .bookingReference(generateBookingReference())
@@ -75,7 +85,17 @@ public class BookingService {
                 .event(event)
                 .build();
 
-        Booking savedBooking = bookingRepository.save(booking);
+        Booking savedBooking =
+                bookingRepository.save(booking);
+
+        // Create booking confirmation notification
+        notificationService.createNotification(
+                user.getId(),
+                "Booking Confirmed",
+                "Your booking for "
+                        + event.getTitle()
+                        + " has been confirmed."
+        );
 
         return bookingMapper.toResponse(savedBooking);
     }
@@ -96,7 +116,8 @@ public class BookingService {
                 .orElseThrow(() ->
                         new UserNotFoundException(email));
 
-        return bookingRepository.findByUserOrderByCreatedAtDesc(user)
+        return bookingRepository
+                .findByUserOrderByCreatedAtDesc(user)
                 .stream()
                 .map(bookingMapper::toResponse)
                 .collect(Collectors.toList());
