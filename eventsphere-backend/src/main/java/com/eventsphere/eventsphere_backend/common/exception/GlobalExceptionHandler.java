@@ -230,4 +230,19 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .build();
     }
+
+    // Notification Not Found Exception
+    @ExceptionHandler(NotificationNotFoundException.class)
+    public ErrorResponse handleNotificationNotFoundException(
+            NotificationNotFoundException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
 }
