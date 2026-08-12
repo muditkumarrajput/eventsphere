@@ -6,6 +6,7 @@ import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
 import com.eventsphere.eventsphere_backend.common.exception.BookingNotFoundException;
 import com.eventsphere.eventsphere_backend.common.exception.PaymentAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.common.exception.PaymentNotFoundException;
+import com.eventsphere.eventsphere_backend.common.exception.PaymentStateTransitionException;
 import com.eventsphere.eventsphere_backend.notification.service.NotificationService;
 import com.eventsphere.eventsphere_backend.payment.dto.CreatePaymentRequest;
 import com.eventsphere.eventsphere_backend.payment.dto.PaymentResponse;
@@ -75,6 +76,16 @@ public class PaymentService {
                 .orElseThrow(() ->
                         new PaymentNotFoundException(id));
 
+        // Payment must be PENDING before becoming SUCCESS
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
+
+            throw new PaymentStateTransitionException(
+                    id,
+                    payment.getPaymentStatus().name(),
+                    PaymentStatus.SUCCESS.name()
+            );
+        }
+
         Booking booking = payment.getBooking();
 
         // Update payment status
@@ -96,6 +107,49 @@ public class PaymentService {
                 "Your payment for booking "
                         + booking.getBookingReference()
                         + " was successful."
+        );
+
+        return toResponse(savedPayment);
+    }
+
+    // Mark Payment as Failed
+    public PaymentResponse markPaymentFailed(Long id) {
+
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() ->
+                        new PaymentNotFoundException(id));
+
+        // Payment must be PENDING before becoming FAILED
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
+
+            throw new PaymentStateTransitionException(
+                    id,
+                    payment.getPaymentStatus().name(),
+                    PaymentStatus.FAILED.name()
+            );
+        }
+
+        Booking booking = payment.getBooking();
+
+        // Update payment status
+        payment.setPaymentStatus(PaymentStatus.FAILED);
+
+        // Cancel booking
+        booking.setBookingStatus(BookingStatus.CANCELLED);
+
+        // Save booking
+        bookingRepository.save(booking);
+
+        // Save payment
+        Payment savedPayment = paymentRepository.save(payment);
+
+        // Create payment failure notification
+        notificationService.createNotification(
+                booking.getUser().getId(),
+                "Payment Failed",
+                "Your payment for booking "
+                        + booking.getBookingReference()
+                        + " failed. Your booking has been cancelled."
         );
 
         return toResponse(savedPayment);

@@ -45,4 +45,12 @@ public class PaymentController {
 
         return paymentService.markPaymentSuccessful(id);
     }
+
+    // Mark Payment as Failed
+    @PatchMapping("/{id}/failure")
+    public PaymentResponse markPaymentFailed(
+            @PathVariable Long id) {
+
+        return paymentService.markPaymentFailed(id);
+    }
 }

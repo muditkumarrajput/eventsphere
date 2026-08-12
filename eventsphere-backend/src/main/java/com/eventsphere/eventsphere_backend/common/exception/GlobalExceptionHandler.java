@@ -245,4 +245,20 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .build();
     }
+
+    // Invalid Payment State Transition Exception
+    @ExceptionHandler(PaymentStateTransitionException.class)
+    public ErrorResponse handlePaymentStateTransitionException(
+            PaymentStateTransitionException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
 }
