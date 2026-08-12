@@ -37,4 +37,12 @@ public class PaymentController {
 
         return paymentService.getPaymentById(id);
     }
+
+    // Mark Payment as Successful
+    @PatchMapping("/{id}/success")
+    public PaymentResponse markPaymentSuccessful(
+            @PathVariable Long id) {
+
+        return paymentService.markPaymentSuccessful(id);
+    }
 }

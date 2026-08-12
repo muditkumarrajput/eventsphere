@@ -9,7 +9,6 @@ import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
 import com.eventsphere.eventsphere_backend.common.exception.*;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
-import com.eventsphere.eventsphere_backend.notification.service.NotificationService;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -27,20 +26,17 @@ public class BookingService {
     private final UserRepository userRepository;
     private final EventRepository eventRepository;
     private final BookingMapper bookingMapper;
-    private final NotificationService notificationService;
 
     public BookingService(
             BookingRepository bookingRepository,
             UserRepository userRepository,
             EventRepository eventRepository,
-            BookingMapper bookingMapper,
-            NotificationService notificationService) {
+            BookingMapper bookingMapper) {
 
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.eventRepository = eventRepository;
         this.bookingMapper = bookingMapper;
-        this.notificationService = notificationService;
     }
 
     // Create Booking
@@ -68,18 +64,24 @@ public class BookingService {
             throw new EventCapacityExceededException();
         }
 
-        BigDecimal totalAmount = event.getTicketPrice()
-                .multiply(
-                        BigDecimal.valueOf(
-                                request.getNumberOfTickets()
-                        )
-                );
+        // Calculate total booking amount
+        BigDecimal totalAmount =
+                event.getTicketPrice()
+                        .multiply(
+                                BigDecimal.valueOf(
+                                        request.getNumberOfTickets()
+                                )
+                        );
 
+        // Create booking
         Booking booking = Booking.builder()
                 .bookingReference(generateBookingReference())
                 .numberOfTickets(request.getNumberOfTickets())
                 .totalAmount(totalAmount)
-                .bookingStatus(BookingStatus.CONFIRMED)
+
+                // Booking is pending until payment succeeds
+                .bookingStatus(BookingStatus.PENDING)
+
                 .bookingDate(LocalDateTime.now())
                 .user(user)
                 .event(event)
@@ -87,15 +89,6 @@ public class BookingService {
 
         Booking savedBooking =
                 bookingRepository.save(booking);
-
-        // Create booking confirmation notification
-        notificationService.createNotification(
-                user.getId(),
-                "Booking Confirmed",
-                "Your booking for "
-                        + event.getTitle()
-                        + " has been confirmed."
-        );
 
         return bookingMapper.toResponse(savedBooking);
     }
@@ -110,7 +103,8 @@ public class BookingService {
     }
 
     // Get My Bookings
-    public List<BookingResponse> getMyBookings(String email) {
+    public List<BookingResponse> getMyBookings(
+            String email) {
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() ->
@@ -163,11 +157,15 @@ public class BookingService {
         }
 
         // Prevent cancelling an already cancelled booking
-        if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
+        if (booking.getBookingStatus() ==
+                BookingStatus.CANCELLED) {
+
             throw new BookingAlreadyCancelledException(id);
         }
 
-        booking.setBookingStatus(BookingStatus.CANCELLED);
+        booking.setBookingStatus(
+                BookingStatus.CANCELLED
+        );
 
         bookingRepository.save(booking);
     }
