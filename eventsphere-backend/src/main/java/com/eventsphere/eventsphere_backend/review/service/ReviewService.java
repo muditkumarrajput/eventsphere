@@ -1,5 +1,7 @@
 package com.eventsphere.eventsphere_backend.review.service;
 
+import com.eventsphere.eventsphere_backend.booking.entity.BookingStatus;
+import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
 import com.eventsphere.eventsphere_backend.common.exception.*;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
@@ -20,17 +22,20 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
     private final EventRepository eventRepository;
+    private final BookingRepository bookingRepository;
     private final ReviewMapper reviewMapper;
 
     public ReviewService(
             ReviewRepository reviewRepository,
             UserRepository userRepository,
             EventRepository eventRepository,
+            BookingRepository bookingRepository,
             ReviewMapper reviewMapper) {
 
         this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
         this.eventRepository = eventRepository;
+        this.bookingRepository = bookingRepository;
         this.reviewMapper = reviewMapper;
     }
 
@@ -46,6 +51,18 @@ public class ReviewService {
         Event event = eventRepository.findById(request.getEventId())
                 .orElseThrow(() ->
                         new EventNotFoundException(request.getEventId()));
+
+        // User must have at least one confirmed booking for this event
+        boolean hasConfirmedBooking =
+                bookingRepository.existsByUserAndEventAndBookingStatus(
+                        user,
+                        event,
+                        BookingStatus.CONFIRMED
+                );
+
+        if (!hasConfirmedBooking) {
+            throw new ReviewNotAllowedException(event.getId());
+        }
 
         // Prevent duplicate review
         if (reviewRepository.existsByUserAndEvent(user, event)) {

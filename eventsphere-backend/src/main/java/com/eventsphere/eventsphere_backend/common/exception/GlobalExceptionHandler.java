@@ -261,4 +261,19 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
+    // Review Not Allowed Exception
+    @ExceptionHandler(ReviewNotAllowedException.class)
+    public ErrorResponse handleReviewNotAllowedException(
+            ReviewNotAllowedException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
 }
