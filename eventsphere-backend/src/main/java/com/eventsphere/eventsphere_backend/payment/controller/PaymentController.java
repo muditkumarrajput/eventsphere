@@ -22,10 +22,14 @@ public class PaymentController {
     // Create Payment
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(
-            @Valid @RequestBody CreatePaymentRequest request) {
+            @Valid @RequestBody CreatePaymentRequest request,
+            org.springframework.security.core.Authentication authentication) {
 
         PaymentResponse response =
-                paymentService.createPayment(request);
+                paymentService.createPayment(
+                        request,
+                        authentication.getName()
+                );
 
         return ResponseEntity.ok(response);
     }
@@ -33,24 +37,36 @@ public class PaymentController {
     // Get Payment by ID
     @GetMapping("/{id}")
     public PaymentResponse getPaymentById(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            org.springframework.security.core.Authentication authentication) {
 
-        return paymentService.getPaymentById(id);
+        return paymentService.getPaymentById(
+                id,
+                authentication.getName()
+        );
     }
 
     // Mark Payment as Successful
     @PatchMapping("/{id}/success")
     public PaymentResponse markPaymentSuccessful(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            org.springframework.security.core.Authentication authentication) {
 
-        return paymentService.markPaymentSuccessful(id);
+        return paymentService.markPaymentSuccessful(
+                id,
+                authentication.getName()
+        );
     }
 
     // Mark Payment as Failed
     @PatchMapping("/{id}/failure")
     public PaymentResponse markPaymentFailed(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            org.springframework.security.core.Authentication authentication) {
 
-        return paymentService.markPaymentFailed(id);
+        return paymentService.markPaymentFailed(
+                id,
+                authentication.getName()
+        );
     }
 }

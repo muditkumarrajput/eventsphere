@@ -186,6 +186,21 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
+    // User Has Events Exception
+    @ExceptionHandler(UserHasEventsException.class)
+    public ErrorResponse handleUserHasEventsException(
+            UserHasEventsException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
     // Generic Exception
     @ExceptionHandler(Exception.class)
     public ErrorResponse handleGenericException(

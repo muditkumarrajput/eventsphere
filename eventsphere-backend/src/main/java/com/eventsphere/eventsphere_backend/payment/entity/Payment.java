@@ -34,9 +34,12 @@ public class Payment {
 
     private LocalDateTime paymentDate;
 
-    // One payment belongs to one booking
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false, unique = true)
+    @JoinColumn(
+            name = "booking_id",
+            nullable = false,
+            unique = true
+    )
     private Booking booking;
 
     @CreationTimestamp

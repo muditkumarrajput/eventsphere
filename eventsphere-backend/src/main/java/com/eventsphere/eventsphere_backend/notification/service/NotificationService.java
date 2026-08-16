@@ -25,7 +25,10 @@ public class NotificationService {
         this.userRepository = userRepository;
     }
 
-    // Create notification
+    // ===========================
+    // Create Notification
+    // ===========================
+
     public NotificationResponse createNotification(
             Long userId,
             String title,
@@ -47,7 +50,10 @@ public class NotificationService {
         );
     }
 
-    // Get my notifications
+    // ===========================
+    // Get My Notifications
+    // ===========================
+
     public List<NotificationResponse> getMyNotifications(
             String email) {
 
@@ -62,7 +68,10 @@ public class NotificationService {
                 .toList();
     }
 
-    // Get unread notifications
+    // ===========================
+    // Get Unread Notifications
+    // ===========================
+
     public List<NotificationResponse> getUnreadNotifications(
             String email) {
 
@@ -77,8 +86,12 @@ public class NotificationService {
                 .toList();
     }
 
-    // Count unread notifications
-    public long getUnreadCount(String email) {
+    // ===========================
+    // Get Unread Notification Count
+    // ===========================
+
+    public long getUnreadCount(
+            String email) {
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() ->
@@ -88,20 +101,40 @@ public class NotificationService {
                 .countByUserAndIsReadFalse(user);
     }
 
-    // Mark notification as read
-    public void markAsRead(Long notificationId) {
+    // ===========================
+    // Mark Notification as Read
+    // ===========================
+
+    public void markAsRead(
+            Long notificationId,
+            String email) {
 
         Notification notification =
                 notificationRepository.findById(notificationId)
                         .orElseThrow(() ->
-                new NotificationNotFoundException(notificationId));
+                                new NotificationNotFoundException(
+                                        notificationId
+                                ));
+
+        // Check notification ownership
+        if (!notification.getUser().getEmail().equals(email)) {
+
+            // Deliberately return "not found" rather than
+            // revealing that another user's notification exists.
+            throw new NotificationNotFoundException(
+                    notificationId
+            );
+        }
 
         notification.setRead(true);
 
         notificationRepository.save(notification);
     }
 
-    // Convert entity to response
+    // ===========================
+    // Convert Entity to Response
+    // ===========================
+
     private NotificationResponse toResponse(
             Notification notification) {
 

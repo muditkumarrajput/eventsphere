@@ -1,6 +1,7 @@
 package com.eventsphere.eventsphere_backend.booking.entity;
 
 import com.eventsphere.eventsphere_backend.event.entity.Event;
+import com.eventsphere.eventsphere_backend.payment.entity.Payment;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -48,6 +49,14 @@ public class Booking {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)
     private Event event;
+
+    // One booking can have one payment
+    @OneToOne(
+            mappedBy = "booking",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private Payment payment;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
