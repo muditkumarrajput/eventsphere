@@ -14,7 +14,8 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 
 @Component
-public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+public class JwtAuthenticationEntryPoint
+        implements AuthenticationEntryPoint {
 
     @Override
     public void commence(
@@ -23,17 +24,36 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
             AuthenticationException authException)
             throws IOException, ServletException {
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error(HttpStatus.UNAUTHORIZED.getReasonPhrase())
-                .message("Authentication is required to access this resource.")
-                .path(request.getRequestURI())
-                .build();
+        ErrorResponse error =
+                ErrorResponse.builder()
+                        .timestamp(LocalDateTime.now())
+                        .status(
+                                HttpStatus.UNAUTHORIZED.value()
+                        )
+                        .error(
+                                HttpStatus.UNAUTHORIZED
+                                        .getReasonPhrase()
+                        )
+                        .message(
+                                "Authentication is required to access this resource."
+                        )
+                        .path(
+                                request.getRequestURI()
+                        )
+                        .build();
 
-        response.setStatus(HttpStatus.UNAUTHORIZED.value());
-        response.setContentType("application/json");
+        response.setStatus(
+                HttpStatus.UNAUTHORIZED.value()
+        );
 
-        new ObjectMapper().writeValue(response.getOutputStream(), error);
+        response.setContentType(
+                "application/json"
+        );
+
+        new ObjectMapper()
+                .writeValue(
+                        response.getOutputStream(),
+                        error
+                );
     }
 }

@@ -14,7 +14,8 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 
 @Component
-public class JwtAccessDeniedHandler implements AccessDeniedHandler {
+public class JwtAccessDeniedHandler
+        implements AccessDeniedHandler {
 
     @Override
     public void handle(
@@ -23,17 +24,34 @@ public class JwtAccessDeniedHandler implements AccessDeniedHandler {
             AccessDeniedException accessDeniedException)
             throws IOException, ServletException {
 
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.FORBIDDEN.value())
-                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
-                .message("Access Denied.")
-                .path(request.getRequestURI())
-                .build();
+        ErrorResponse error =
+                ErrorResponse.builder()
+                        .timestamp(LocalDateTime.now())
+                        .status(
+                                HttpStatus.FORBIDDEN.value()
+                        )
+                        .error(
+                                HttpStatus.FORBIDDEN
+                                        .getReasonPhrase()
+                        )
+                        .message("Access Denied.")
+                        .path(
+                                request.getRequestURI()
+                        )
+                        .build();
 
-        response.setStatus(HttpStatus.FORBIDDEN.value());
-        response.setContentType("application/json");
+        response.setStatus(
+                HttpStatus.FORBIDDEN.value()
+        );
 
-        new ObjectMapper().writeValue(response.getOutputStream(), error);
+        response.setContentType(
+                "application/json"
+        );
+
+        new ObjectMapper()
+                .writeValue(
+                        response.getOutputStream(),
+                        error
+                );
     }
 }
