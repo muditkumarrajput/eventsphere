@@ -4,6 +4,7 @@ import com.eventsphere.eventsphere_backend.booking.dto.BookingResponse;
 import com.eventsphere.eventsphere_backend.booking.dto.CreateBookingRequest;
 import com.eventsphere.eventsphere_backend.booking.service.BookingService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,7 +20,13 @@ public class BookingController {
         this.bookingService = bookingService;
     }
 
+    // =========================================================
+    // CREATE BOOKING
+    // AUTHENTICATED USERS
+    // =========================================================
+
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public BookingResponse createBooking(
             @Valid @RequestBody CreateBookingRequest request,
             Authentication authentication) {
@@ -30,12 +37,25 @@ public class BookingController {
         );
     }
 
+    // =========================================================
+    // GET ALL BOOKINGS
+    // ADMIN ONLY
+    // =========================================================
+
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<BookingResponse> getAllBookings() {
+
         return bookingService.getAllBookings();
     }
 
+    // =========================================================
+    // GET MY BOOKINGS
+    // AUTHENTICATED USERS
+    // =========================================================
+
     @GetMapping("/my")
+    @PreAuthorize("isAuthenticated()")
     public List<BookingResponse> getMyBookings(
             Authentication authentication) {
 
@@ -44,7 +64,14 @@ public class BookingController {
         );
     }
 
+    // =========================================================
+    // GET BOOKING BY ID
+    // AUTHENTICATED USERS
+    // OWNERSHIP CHECKED IN SERVICE
+    // =========================================================
+
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public BookingResponse getBookingById(
             @PathVariable Long id,
             Authentication authentication) {
@@ -55,7 +82,14 @@ public class BookingController {
         );
     }
 
+    // =========================================================
+    // CANCEL BOOKING
+    // AUTHENTICATED USERS
+    // OWNERSHIP CHECKED IN SERVICE
+    // =========================================================
+
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public void cancelBooking(
             @PathVariable Long id,
             Authentication authentication) {
