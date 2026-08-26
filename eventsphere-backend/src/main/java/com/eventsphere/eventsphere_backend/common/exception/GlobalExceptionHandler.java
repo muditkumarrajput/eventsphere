@@ -14,7 +14,10 @@ import java.time.LocalDateTime;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // Event Not Found Exception
+    // =========================================================
+    // EVENT NOT FOUND EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(EventNotFoundException.class)
     public ErrorResponse handleEventNotFoundException(
             EventNotFoundException ex,
@@ -29,7 +32,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Review Ownership Exception
+    // =========================================================
+    // REVIEW OWNERSHIP EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(ReviewOwnershipException.class)
     public ErrorResponse handleReviewOwnershipException(
             ReviewOwnershipException ex,
@@ -44,7 +50,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Invalid Request Parameter / Enum Conversion Exception
+    // =========================================================
+    // INVALID REQUEST PARAMETER / ENUM CONVERSION EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ErrorResponse handleMethodArgumentTypeMismatchException(
             MethodArgumentTypeMismatchException ex,
@@ -62,7 +71,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Booking Not Found Exception
+    // =========================================================
+    // BOOKING NOT FOUND EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(BookingNotFoundException.class)
     public ErrorResponse handleBookingNotFoundException(
             BookingNotFoundException ex,
@@ -77,7 +89,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Booking Already Cancelled Exception
+    // =========================================================
+    // BOOKING ALREADY CANCELLED EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(BookingAlreadyCancelledException.class)
     public ErrorResponse handleBookingAlreadyCancelledException(
             BookingAlreadyCancelledException ex,
@@ -92,7 +107,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Review Already Exists Exception
+    // =========================================================
+    // REVIEW ALREADY EXISTS EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(ReviewAlreadyExistsException.class)
     public ErrorResponse handleReviewAlreadyExistsException(
             ReviewAlreadyExistsException ex,
@@ -107,7 +125,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Payment Already Exists Exception
+    // =========================================================
+    // PAYMENT ALREADY EXISTS EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(PaymentAlreadyExistsException.class)
     public ErrorResponse handlePaymentAlreadyExistsException(
             PaymentAlreadyExistsException ex,
@@ -122,7 +143,28 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Event Capacity Exceeded Exception
+    // =========================================================
+    // USER EMAIL ALREADY EXISTS EXCEPTION
+    // =========================================================
+
+    @ExceptionHandler(UserEmailAlreadyExistsException.class)
+    public ErrorResponse handleUserEmailAlreadyExistsException(
+            UserEmailAlreadyExistsException ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
+
+    // =========================================================
+    // EVENT CAPACITY EXCEEDED EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(EventCapacityExceededException.class)
     public ErrorResponse handleEventCapacityExceededException(
             EventCapacityExceededException ex,
@@ -137,7 +179,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Validation Exception
+    // =========================================================
+    // VALIDATION EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ErrorResponse handleValidationException(
             MethodArgumentNotValidException ex,
@@ -156,7 +201,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Authorization Denied Exception
+    // =========================================================
+    // AUTHORIZATION DENIED EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ErrorResponse handleAuthorizationDeniedException(
             AuthorizationDeniedException ex,
@@ -171,7 +219,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Event Ownership Exception
+    // =========================================================
+    // EVENT OWNERSHIP EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(EventOwnershipException.class)
     public ErrorResponse handleEventOwnershipException(
             EventOwnershipException ex,
@@ -186,7 +237,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // User Has Events Exception
+    // =========================================================
+    // USER HAS EVENTS EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(UserHasEventsException.class)
     public ErrorResponse handleUserHasEventsException(
             UserHasEventsException ex,
@@ -201,22 +255,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Generic Exception
-    @ExceptionHandler(Exception.class)
-    public ErrorResponse handleGenericException(
-            Exception ex,
-            HttpServletRequest request) {
+    // =========================================================
+    // REVIEW NOT FOUND EXCEPTION
+    // =========================================================
 
-        return ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-    }
-
-    // Review Not Found Exception
     @ExceptionHandler(ReviewNotFoundException.class)
     public ErrorResponse handleReviewNotFoundException(
             ReviewNotFoundException ex,
@@ -231,7 +273,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Payment Not Found Exception
+    // =========================================================
+    // PAYMENT NOT FOUND EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(PaymentNotFoundException.class)
     public ErrorResponse handlePaymentNotFoundException(
             PaymentNotFoundException ex,
@@ -246,7 +291,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Notification Not Found Exception
+    // =========================================================
+    // NOTIFICATION NOT FOUND EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(NotificationNotFoundException.class)
     public ErrorResponse handleNotificationNotFoundException(
             NotificationNotFoundException ex,
@@ -261,7 +309,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Invalid Payment State Transition Exception
+    // =========================================================
+    // PAYMENT STATE TRANSITION EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(PaymentStateTransitionException.class)
     public ErrorResponse handlePaymentStateTransitionException(
             PaymentStateTransitionException ex,
@@ -276,7 +327,10 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Review Not Allowed Exception
+    // =========================================================
+    // REVIEW NOT ALLOWED EXCEPTION
+    // =========================================================
+
     @ExceptionHandler(ReviewNotAllowedException.class)
     public ErrorResponse handleReviewNotAllowedException(
             ReviewNotAllowedException ex,
@@ -291,4 +345,21 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
+    // =========================================================
+    // GENERIC EXCEPTION
+    // =========================================================
+
+    @ExceptionHandler(Exception.class)
+    public ErrorResponse handleGenericException(
+            Exception ex,
+            HttpServletRequest request) {
+
+        return ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+    }
 }

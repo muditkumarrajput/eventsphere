@@ -1,8 +1,10 @@
 package com.eventsphere.eventsphere_backend.user.service;
 
+import com.eventsphere.eventsphere_backend.common.exception.UserEmailAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.common.exception.UserHasEventsException;
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
+import com.eventsphere.eventsphere_backend.user.dto.ChangeUserRoleRequest;
 import com.eventsphere.eventsphere_backend.user.dto.UpdateUserRequest;
 import com.eventsphere.eventsphere_backend.user.dto.UserResponse;
 import com.eventsphere.eventsphere_backend.user.entity.User;
@@ -40,6 +42,7 @@ public class UserService {
 
     // =========================================================
     // GET ALL USERS
+    // ADMIN ONLY
     // =========================================================
 
     public List<UserResponse> getAllUsers() {
@@ -65,6 +68,7 @@ public class UserService {
 
     // =========================================================
     // GET USER BY ID
+    // ADMIN ONLY
     // =========================================================
 
     public UserResponse getUserById(Long id) {
@@ -77,16 +81,30 @@ public class UserService {
     }
 
     // =========================================================
-    // UPDATE USER PROFILE
+    // UPDATE CURRENT USER PROFILE
     // =========================================================
 
     public UserResponse updateUser(
-            Long id,
+            String email,
             UpdateUserRequest request) {
 
-        User existingUser = userRepository.findById(id)
+        User existingUser = userRepository.findByEmail(email)
                 .orElseThrow(() ->
-                        new UserNotFoundException(id));
+                        new UserNotFoundException(email));
+
+        /*
+         * Check whether the requested email is already
+         * being used by another user.
+         *
+         * The current user's existing email is allowed.
+         */
+        if (!existingUser.getEmail().equals(request.getEmail())
+                && userRepository.existsByEmail(request.getEmail())) {
+
+            throw new UserEmailAlreadyExistsException(
+                    request.getEmail()
+            );
+        }
 
         existingUser.setName(request.getName());
         existingUser.setEmail(request.getEmail());
@@ -96,6 +114,13 @@ public class UserService {
          * IMPORTANT:
          *
          * Role is intentionally NOT updated here.
+         *
+         * Password is also NOT updated here.
+         *
+         * Profile updates are limited to:
+         * - name
+         * - email
+         * - phoneNumber
          *
          * Role changes must happen through the
          * dedicated ADMIN-only role management endpoint.
@@ -108,7 +133,29 @@ public class UserService {
     }
 
     // =========================================================
+    // CHANGE USER ROLE
+    // ADMIN ONLY
+    // =========================================================
+
+    public UserResponse changeUserRole(
+            Long id,
+            ChangeUserRoleRequest request) {
+
+        User existingUser = userRepository.findById(id)
+                .orElseThrow(() ->
+                        new UserNotFoundException(id));
+
+        existingUser.setRole(request.getRole());
+
+        User savedUser =
+                userRepository.save(existingUser);
+
+        return userMapper.toResponse(savedUser);
+    }
+
+    // =========================================================
     // DELETE USER
+    // ADMIN ONLY
     // =========================================================
 
     public void deleteUser(Long id) {

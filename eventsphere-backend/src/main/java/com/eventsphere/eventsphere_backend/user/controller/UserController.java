@@ -1,8 +1,8 @@
 package com.eventsphere.eventsphere_backend.user.controller;
 
+import com.eventsphere.eventsphere_backend.user.dto.ChangeUserRoleRequest;
 import com.eventsphere.eventsphere_backend.user.dto.UpdateUserRequest;
 import com.eventsphere.eventsphere_backend.user.dto.UserResponse;
-import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,16 +22,6 @@ public class UserController {
     }
 
     // =========================================================
-    // CREATE USER
-    // =========================================================
-
-    @PostMapping
-    public User createUser(@RequestBody User user) {
-
-        return userService.createUser(user);
-    }
-
-    // =========================================================
     // GET ALL USERS - ADMIN ONLY
     // =========================================================
 
@@ -44,9 +34,11 @@ public class UserController {
 
     // =========================================================
     // GET CURRENT USER
+    // AUTHENTICATED USERS
     // =========================================================
 
     @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
     public UserResponse getCurrentUser(
             Authentication authentication) {
 
@@ -68,16 +60,36 @@ public class UserController {
     }
 
     // =========================================================
-    // UPDATE USER PROFILE
+    // UPDATE CURRENT USER PROFILE
+    // AUTHENTICATED USERS
     // =========================================================
 
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public UserResponse updateUser(
-            @PathVariable Long id,
-            @Valid @RequestBody UpdateUserRequest request) {
+    @PutMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public UserResponse updateCurrentUser(
+            @Valid @RequestBody UpdateUserRequest request,
+            Authentication authentication) {
 
-        return userService.updateUser(id, request);
+        return userService.updateUser(
+                authentication.getName(),
+                request
+        );
+    }
+
+    // =========================================================
+    // CHANGE USER ROLE - ADMIN ONLY
+    // =========================================================
+
+    @PatchMapping("/{id}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserResponse changeUserRole(
+            @PathVariable Long id,
+            @Valid @RequestBody ChangeUserRoleRequest request) {
+
+        return userService.changeUserRole(
+                id,
+                request
+        );
     }
 
     // =========================================================
