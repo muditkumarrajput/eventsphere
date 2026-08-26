@@ -1,7 +1,6 @@
 package com.eventsphere.eventsphere_backend.auth.security;
 
-import com.eventsphere.eventsphere_backend.common.response.ErrorResponse;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,11 +10,17 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
-public class JwtAuthenticationEntryPoint
-        implements AuthenticationEntryPoint {
+public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+
+    private final ObjectMapper objectMapper;
+
+    public JwtAuthenticationEntryPoint(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public void commence(
@@ -24,36 +29,16 @@ public class JwtAuthenticationEntryPoint
             AuthenticationException authException)
             throws IOException, ServletException {
 
-        ErrorResponse error =
-                ErrorResponse.builder()
-                        .timestamp(LocalDateTime.now())
-                        .status(
-                                HttpStatus.UNAUTHORIZED.value()
-                        )
-                        .error(
-                                HttpStatus.UNAUTHORIZED
-                                        .getReasonPhrase()
-                        )
-                        .message(
-                                "Authentication is required to access this resource."
-                        )
-                        .path(
-                                request.getRequestURI()
-                        )
-                        .build();
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType("application/json");
 
-        response.setStatus(
-                HttpStatus.UNAUTHORIZED.value()
-        );
+        Map<String, Object> errorResponse = new HashMap<>();
 
-        response.setContentType(
-                "application/json"
-        );
+        errorResponse.put("status", HttpStatus.UNAUTHORIZED.value());
+        errorResponse.put("error", "Unauthorized");
+        errorResponse.put("message", "Authentication is required to access this resource");
+        errorResponse.put("path", request.getRequestURI());
 
-        new ObjectMapper()
-                .writeValue(
-                        response.getOutputStream(),
-                        error
-                );
+        objectMapper.writeValue(response.getOutputStream(), errorResponse);
     }
 }
