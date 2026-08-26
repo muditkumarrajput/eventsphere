@@ -17,49 +17,41 @@ import com.eventsphere.eventsphere_backend.review.mapper.ReviewMapper;
 import com.eventsphere.eventsphere_backend.review.repository.ReviewRepository;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class ReviewServiceTest {
 
+    @Mock
     private ReviewRepository reviewRepository;
+
+    @Mock
     private UserRepository userRepository;
+
+    @Mock
     private EventRepository eventRepository;
+
+    @Mock
     private BookingRepository bookingRepository;
+
+    @Mock
     private ReviewMapper reviewMapper;
 
+    @InjectMocks
     private ReviewService reviewService;
-
-
-    @BeforeEach
-    void setUp() {
-
-        reviewRepository = mock(ReviewRepository.class);
-        userRepository = mock(UserRepository.class);
-        eventRepository = mock(EventRepository.class);
-        bookingRepository = mock(BookingRepository.class);
-        reviewMapper = mock(ReviewMapper.class);
-
-        reviewService = new ReviewService(
-                reviewRepository,
-                userRepository,
-                eventRepository,
-                bookingRepository,
-                reviewMapper
-        );
-    }
 
 
     // =========================================================
@@ -67,196 +59,202 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldCreateReviewSuccessfully() {
+    void shouldCreateReview() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(1L);
+
+        Event event = new Event();
+        event.setId(8L);
 
         CreateReviewRequest request =
-                new CreateReviewRequest();
+                CreateReviewRequest.builder()
+                        .eventId(8L)
+                        .rating(5)
+                        .comment("Excellent event")
+                        .build();
 
-        request.setEventId(3L);
-        request.setRating(5);
-        request.setComment("Excellent workshop!");
-
-        User user = mock(User.class);
-        Event event = mock(Event.class);
-        Review savedReview = mock(Review.class);
+        Review review =
+                Review.builder()
+                        .id(10L)
+                        .user(user)
+                        .event(event)
+                        .rating(5)
+                        .comment("Excellent event")
+                        .build();
 
         ReviewResponse response =
                 ReviewResponse.builder()
-                        .id(5L)
-                        .userId(10L)
-                        .eventId(3L)
+                        .id(10L)
+                        .eventId(8L)
+                        .userId(1L)
                         .rating(5)
-                        .comment("Excellent workshop!")
+                        .comment("Excellent event")
                         .build();
 
-        when(userRepository.findByEmail("user@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(3L))
+        when(eventRepository.findById(8L))
                 .thenReturn(Optional.of(event));
 
-        when(event.getId())
-                .thenReturn(3L);
+        when(bookingRepository
+                .existsByUserAndEventAndBookingStatus(
+                        user,
+                        event,
+                        BookingStatus.CONFIRMED
+                ))
+                .thenReturn(true);
 
-        when(bookingRepository.existsByUserAndEventAndBookingStatus(
+        when(reviewRepository.existsByUserAndEvent(
                 user,
-                event,
-                BookingStatus.CONFIRMED
-        )).thenReturn(true);
-
-        when(reviewRepository.existsByUserAndEvent(user, event))
-                .thenReturn(false);
+                event
+        )).thenReturn(false);
 
         when(reviewRepository.save(any(Review.class)))
-                .thenReturn(savedReview);
+                .thenReturn(review);
 
-        when(reviewMapper.toResponse(savedReview))
+        when(reviewMapper.toResponse(review))
                 .thenReturn(response);
 
         ReviewResponse result =
                 reviewService.createReview(
                         request,
-                        "user@test.com"
+                        email
                 );
 
-        assertEquals(5L, result.getId());
-        assertEquals(3L, result.getEventId());
+        assertEquals(10L, result.getId());
+        assertEquals(8L, result.getEventId());
+        assertEquals(1L, result.getUserId());
         assertEquals(5, result.getRating());
         assertEquals(
-                "Excellent workshop!",
+                "Excellent event",
                 result.getComment()
         );
 
-        verify(userRepository)
-                .findByEmail("user@test.com");
-
-        verify(eventRepository)
-                .findById(3L);
-
+        verify(userRepository).findByEmail(email);
+        verify(eventRepository).findById(8L);
         verify(bookingRepository)
                 .existsByUserAndEventAndBookingStatus(
                         user,
                         event,
                         BookingStatus.CONFIRMED
                 );
-
         verify(reviewRepository)
                 .existsByUserAndEvent(user, event);
-
         verify(reviewRepository)
                 .save(any(Review.class));
-
-        verify(reviewMapper)
-                .toResponse(savedReview);
+        verify(reviewMapper).toResponse(review);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenUserNotFoundWhileCreatingReview() {
+    void shouldThrowExceptionWhenUserDoesNotExistDuringCreate() {
+
+        String email = "unknown@test.com";
 
         CreateReviewRequest request =
-                new CreateReviewRequest();
+                CreateReviewRequest.builder()
+                        .eventId(8L)
+                        .rating(5)
+                        .comment("Good")
+                        .build();
 
-        request.setEventId(3L);
-
-        when(userRepository.findByEmail("unknown@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 UserNotFoundException.class,
                 () -> reviewService.createReview(
                         request,
-                        "unknown@test.com"
+                        email
                 )
         );
 
-        verify(userRepository)
-                .findByEmail("unknown@test.com");
-
-        verify(eventRepository, never())
-                .findById(any(Long.class));
+        verifyNoInteractions(eventRepository);
+        verifyNoInteractions(bookingRepository);
+        verifyNoInteractions(reviewRepository);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenEventNotFoundWhileCreatingReview() {
+    void shouldThrowExceptionWhenEventDoesNotExistDuringCreate() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(1L);
 
         CreateReviewRequest request =
-                new CreateReviewRequest();
+                CreateReviewRequest.builder()
+                        .eventId(999L)
+                        .rating(5)
+                        .comment("Good")
+                        .build();
 
-        request.setEventId(3L);
-
-        User user = mock(User.class);
-
-        when(userRepository.findByEmail("user@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(3L))
+        when(eventRepository.findById(999L))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 EventNotFoundException.class,
                 () -> reviewService.createReview(
                         request,
-                        "user@test.com"
+                        email
                 )
         );
 
-        verify(eventRepository)
-                .findById(3L);
-
-        verify(bookingRepository, never())
-                .existsByUserAndEventAndBookingStatus(
-                        any(User.class),
-                        any(Event.class),
-                        any(BookingStatus.class)
-                );
+        verifyNoInteractions(bookingRepository);
+        verifyNoInteractions(reviewRepository);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenUserHasNoConfirmedBooking() {
+    void shouldRejectReviewWhenUserHasNoConfirmedBooking() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(1L);
+
+        Event event = new Event();
+        event.setId(8L);
 
         CreateReviewRequest request =
-                new CreateReviewRequest();
+                CreateReviewRequest.builder()
+                        .eventId(8L)
+                        .rating(5)
+                        .comment("Good")
+                        .build();
 
-        request.setEventId(3L);
-
-        User user = mock(User.class);
-        Event event = mock(Event.class);
-
-        when(userRepository.findByEmail("user@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(3L))
+        when(eventRepository.findById(8L))
                 .thenReturn(Optional.of(event));
 
-        when(event.getId())
-                .thenReturn(3L);
-
-        when(bookingRepository.existsByUserAndEventAndBookingStatus(
-                user,
-                event,
-                BookingStatus.CONFIRMED
-        )).thenReturn(false);
+        when(bookingRepository
+                .existsByUserAndEventAndBookingStatus(
+                        user,
+                        event,
+                        BookingStatus.CONFIRMED
+                ))
+                .thenReturn(false);
 
         assertThrows(
                 ReviewNotAllowedException.class,
                 () -> reviewService.createReview(
                         request,
-                        "user@test.com"
+                        email
                 )
         );
 
-        verify(bookingRepository)
-                .existsByUserAndEventAndBookingStatus(
-                        user,
-                        event,
-                        BookingStatus.CONFIRMED
-                );
-
         verify(reviewRepository, never())
-                .existsByUserAndEvent(user, event);
+                .existsByUserAndEvent(any(), any());
 
         verify(reviewRepository, never())
                 .save(any(Review.class));
@@ -264,44 +262,49 @@ class ReviewServiceTest {
 
 
     @Test
-    void shouldThrowExceptionWhenReviewAlreadyExists() {
+    void shouldRejectDuplicateReview() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(1L);
+
+        Event event = new Event();
+        event.setId(8L);
 
         CreateReviewRequest request =
-                new CreateReviewRequest();
+                CreateReviewRequest.builder()
+                        .eventId(8L)
+                        .rating(5)
+                        .comment("Good")
+                        .build();
 
-        request.setEventId(3L);
-
-        User user = mock(User.class);
-        Event event = mock(Event.class);
-
-        when(userRepository.findByEmail("user@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(3L))
+        when(eventRepository.findById(8L))
                 .thenReturn(Optional.of(event));
 
-        when(event.getId())
-                .thenReturn(3L);
-
-        when(bookingRepository.existsByUserAndEventAndBookingStatus(
-                user,
-                event,
-                BookingStatus.CONFIRMED
-        )).thenReturn(true);
-
-        when(reviewRepository.existsByUserAndEvent(user, event))
+        when(bookingRepository
+                .existsByUserAndEventAndBookingStatus(
+                        user,
+                        event,
+                        BookingStatus.CONFIRMED
+                ))
                 .thenReturn(true);
+
+        when(reviewRepository.existsByUserAndEvent(
+                user,
+                event
+        )).thenReturn(true);
 
         assertThrows(
                 ReviewAlreadyExistsException.class,
                 () -> reviewService.createReview(
                         request,
-                        "user@test.com"
+                        email
                 )
         );
-
-        verify(reviewRepository)
-                .existsByUserAndEvent(user, event);
 
         verify(reviewRepository, never())
                 .save(any(Review.class));
@@ -313,63 +316,86 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldGetEventReviewsSuccessfully() {
+    void shouldGetEventReviews() {
 
-        Event event = mock(Event.class);
-        Review review = mock(Review.class);
+        Long eventId = 8L;
 
-        ReviewResponse response =
-                ReviewResponse.builder()
-                        .id(5L)
-                        .eventId(3L)
+        Event event = new Event();
+        event.setId(eventId);
+
+        Review review1 =
+                Review.builder()
+                        .id(10L)
+                        .event(event)
                         .rating(5)
-                        .comment("Excellent workshop!")
                         .build();
 
-        when(eventRepository.findById(3L))
+        Review review2 =
+                Review.builder()
+                        .id(11L)
+                        .event(event)
+                        .rating(4)
+                        .build();
+
+        ReviewResponse response1 =
+                ReviewResponse.builder()
+                        .id(10L)
+                        .eventId(8L)
+                        .rating(5)
+                        .build();
+
+        ReviewResponse response2 =
+                ReviewResponse.builder()
+                        .id(11L)
+                        .eventId(8L)
+                        .rating(4)
+                        .build();
+
+        when(eventRepository.findById(eventId))
                 .thenReturn(Optional.of(event));
 
-        when(reviewRepository.findByEventOrderByCreatedAtDesc(event))
-                .thenReturn(List.of(review));
+        when(reviewRepository
+                .findByEventOrderByCreatedAtDesc(event))
+                .thenReturn(List.of(review1, review2));
 
-        when(reviewMapper.toResponse(review))
-                .thenReturn(response);
+        when(reviewMapper.toResponse(review1))
+                .thenReturn(response1);
+
+        when(reviewMapper.toResponse(review2))
+                .thenReturn(response2);
 
         List<ReviewResponse> result =
-                reviewService.getEventReviews(3L);
+                reviewService.getEventReviews(eventId);
 
-        assertEquals(1, result.size());
-        assertEquals(5L, result.get(0).getId());
-        assertEquals(5, result.get(0).getRating());
-        assertEquals(
-                "Excellent workshop!",
-                result.get(0).getComment()
-        );
+        assertEquals(2, result.size());
+        assertEquals(10L, result.get(0).getId());
+        assertEquals(11L, result.get(1).getId());
 
-        verify(eventRepository)
-                .findById(3L);
+        verify(eventRepository).findById(eventId);
 
         verify(reviewRepository)
                 .findByEventOrderByCreatedAtDesc(event);
 
-        verify(reviewMapper)
-                .toResponse(review);
+        verify(reviewMapper).toResponse(review1);
+        verify(reviewMapper).toResponse(review2);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenEventNotFoundWhileGettingReviews() {
+    void shouldThrowExceptionWhenEventDoesNotExistForReviews() {
 
-        when(eventRepository.findById(3L))
+        Long eventId = 999L;
+
+        when(eventRepository.findById(eventId))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 EventNotFoundException.class,
-                () -> reviewService.getEventReviews(3L)
+                () -> reviewService.getEventReviews(eventId)
         );
 
-        verify(reviewRepository, never())
-                .findByEventOrderByCreatedAtDesc(any(Event.class));
+        verifyNoInteractions(reviewRepository);
+        verifyNoInteractions(reviewMapper);
     }
 
 
@@ -378,129 +404,141 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldGetMyReviewsSuccessfully() {
+    void shouldGetMyReviews() {
 
-        User user = mock(User.class);
-        Review review = mock(Review.class);
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(1L);
+
+        Review review =
+                Review.builder()
+                        .id(10L)
+                        .user(user)
+                        .rating(5)
+                        .comment("Excellent")
+                        .build();
 
         ReviewResponse response =
                 ReviewResponse.builder()
-                        .id(5L)
-                        .userId(10L)
-                        .eventId(3L)
-                        .rating(4)
-                        .comment("Very good workshop!")
+                        .id(10L)
+                        .userId(1L)
+                        .rating(5)
+                        .comment("Excellent")
                         .build();
 
-        when(userRepository.findByEmail("user@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findByUserOrderByCreatedAtDesc(user))
+        when(reviewRepository
+                .findByUserOrderByCreatedAtDesc(user))
                 .thenReturn(List.of(review));
 
         when(reviewMapper.toResponse(review))
                 .thenReturn(response);
 
         List<ReviewResponse> result =
-                reviewService.getMyReviews("user@test.com");
+                reviewService.getMyReviews(email);
 
         assertEquals(1, result.size());
-        assertEquals(5L, result.get(0).getId());
-        assertEquals(4, result.get(0).getRating());
+        assertEquals(10L, result.get(0).getId());
+        assertEquals(5, result.get(0).getRating());
 
-        verify(userRepository)
-                .findByEmail("user@test.com");
+        verify(userRepository).findByEmail(email);
 
         verify(reviewRepository)
                 .findByUserOrderByCreatedAtDesc(user);
 
-        verify(reviewMapper)
-                .toResponse(review);
+        verify(reviewMapper).toResponse(review);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenUserNotFoundWhileGettingMyReviews() {
+    void shouldThrowExceptionWhenUserDoesNotExistForMyReviews() {
 
-        when(userRepository.findByEmail("unknown@test.com"))
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 UserNotFoundException.class,
-                () -> reviewService.getMyReviews(
-                        "unknown@test.com"
-                )
+                () -> reviewService.getMyReviews(email)
         );
 
-        verify(reviewRepository, never())
-                .findByUserOrderByCreatedAtDesc(
-                        any(User.class)
-                );
+        verifyNoInteractions(reviewRepository);
+        verifyNoInteractions(reviewMapper);
     }
 
 
     // =========================================================
-    // GET AVERAGE RATING
+    // AVERAGE RATING
     // =========================================================
 
     @Test
-    void shouldGetAverageRatingSuccessfully() {
+    void shouldGetAverageRating() {
 
-        Event event = mock(Event.class);
+        Long eventId = 8L;
 
-        when(eventRepository.findById(3L))
+        Event event = new Event();
+        event.setId(eventId);
+
+        when(eventRepository.findById(eventId))
                 .thenReturn(Optional.of(event));
 
-        when(reviewRepository.getAverageRating(3L))
+        when(reviewRepository.getAverageRating(eventId))
                 .thenReturn(4.5);
 
         Double result =
-                reviewService.getAverageRating(3L);
+                reviewService.getAverageRating(eventId);
 
         assertEquals(4.5, result);
 
-        verify(eventRepository)
-                .findById(3L);
-
+        verify(eventRepository).findById(eventId);
         verify(reviewRepository)
-                .getAverageRating(3L);
+                .getAverageRating(eventId);
     }
 
 
     @Test
     void shouldReturnZeroWhenEventHasNoReviews() {
 
-        Event event = mock(Event.class);
+        Long eventId = 8L;
 
-        when(eventRepository.findById(3L))
+        Event event = new Event();
+        event.setId(eventId);
+
+        when(eventRepository.findById(eventId))
                 .thenReturn(Optional.of(event));
 
-        when(reviewRepository.getAverageRating(3L))
+        when(reviewRepository.getAverageRating(eventId))
                 .thenReturn(null);
 
         Double result =
-                reviewService.getAverageRating(3L);
+                reviewService.getAverageRating(eventId);
 
         assertEquals(0.0, result);
 
         verify(reviewRepository)
-                .getAverageRating(3L);
+                .getAverageRating(eventId);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenEventNotFoundWhileGettingAverageRating() {
+    void shouldThrowExceptionWhenEventDoesNotExistForAverageRating() {
 
-        when(eventRepository.findById(3L))
+        Long eventId = 999L;
+
+        when(eventRepository.findById(eventId))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 EventNotFoundException.class,
-                () -> reviewService.getAverageRating(3L)
+                () -> reviewService.getAverageRating(eventId)
         );
 
         verify(reviewRepository, never())
-                .getAverageRating(3L);
+                .getAverageRating(anyLong());
     }
 
 
@@ -509,155 +547,150 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldUpdateReviewSuccessfully() {
+    void shouldUpdateOwnReview() {
+
+        Long reviewId = 10L;
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(1L);
+
+        Event event = new Event();
+        event.setId(8L);
+
+        Review review =
+                Review.builder()
+                        .id(reviewId)
+                        .user(user)
+                        .event(event)
+                        .rating(3)
+                        .comment("Average")
+                        .build();
 
         CreateReviewRequest request =
-                new CreateReviewRequest();
-
-        request.setRating(4);
-        request.setComment("Very good workshop!");
-
-        User user = mock(User.class);
-        Review review = mock(Review.class);
-        Review updatedReview = mock(Review.class);
+                CreateReviewRequest.builder()
+                        .eventId(8L)
+                        .rating(5)
+                        .comment("Excellent")
+                        .build();
 
         ReviewResponse response =
                 ReviewResponse.builder()
-                        .id(5L)
-                        .userId(10L)
-                        .eventId(3L)
-                        .rating(4)
-                        .comment("Very good workshop!")
+                        .id(reviewId)
+                        .rating(5)
+                        .comment("Excellent")
                         .build();
 
-        when(userRepository.findByEmail("user@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findById(5L))
+        when(reviewRepository.findById(reviewId))
                 .thenReturn(Optional.of(review));
 
-        when(user.getId())
-                .thenReturn(10L);
-
-        when(review.getUser())
-                .thenReturn(user);
-
         when(reviewRepository.save(review))
-                .thenReturn(updatedReview);
+                .thenReturn(review);
 
-        when(reviewMapper.toResponse(updatedReview))
+        when(reviewMapper.toResponse(review))
                 .thenReturn(response);
 
         ReviewResponse result =
                 reviewService.updateReview(
-                        5L,
+                        reviewId,
                         request,
-                        "user@test.com"
+                        email
                 );
 
-        assertEquals(5L, result.getId());
-        assertEquals(4, result.getRating());
+        assertEquals(5, result.getRating());
         assertEquals(
-                "Very good workshop!",
+                "Excellent",
                 result.getComment()
         );
 
-        verify(review)
-                .setRating(4);
-
-        verify(review)
-                .setComment("Very good workshop!");
-
-        verify(reviewRepository)
-                .save(review);
-
-        verify(reviewMapper)
-                .toResponse(updatedReview);
-    }
-
-
-    @Test
-    void shouldThrowExceptionWhenUserNotFoundWhileUpdatingReview() {
-
-        CreateReviewRequest request =
-                new CreateReviewRequest();
-
-        when(userRepository.findByEmail("unknown@test.com"))
-                .thenReturn(Optional.empty());
-
-        assertThrows(
-                UserNotFoundException.class,
-                () -> reviewService.updateReview(
-                        5L,
-                        request,
-                        "unknown@test.com"
-                )
+        assertEquals(5, review.getRating());
+        assertEquals(
+                "Excellent",
+                review.getComment()
         );
 
-        verify(reviewRepository, never())
-                .findById(5L);
+        verify(reviewRepository).save(review);
+        verify(reviewMapper).toResponse(review);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenReviewNotFoundWhileUpdatingReview() {
+    void shouldThrowExceptionWhenReviewDoesNotExistDuringUpdate() {
+
+        Long reviewId = 999L;
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(1L);
 
         CreateReviewRequest request =
-                new CreateReviewRequest();
+                CreateReviewRequest.builder()
+                        .eventId(8L)
+                        .rating(5)
+                        .comment("Good")
+                        .build();
 
-        User user = mock(User.class);
-
-        when(userRepository.findByEmail("user@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findById(5L))
+        when(reviewRepository.findById(reviewId))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 ReviewNotFoundException.class,
                 () -> reviewService.updateReview(
-                        5L,
+                        reviewId,
                         request,
-                        "user@test.com"
+                        email
                 )
         );
 
-        verify(reviewRepository)
-                .findById(5L);
+        verify(reviewRepository, never())
+                .save(any(Review.class));
     }
 
 
     @Test
-    void shouldThrowExceptionWhenUserDoesNotOwnReview() {
+    void shouldRejectUpdatingAnotherUsersReview() {
+
+        Long reviewId = 10L;
+        String email = "user2@test.com";
+
+        User owner = new User();
+        owner.setId(1L);
+
+        User anotherUser = new User();
+        anotherUser.setId(2L);
+
+        Review review =
+                Review.builder()
+                        .id(reviewId)
+                        .user(owner)
+                        .rating(4)
+                        .build();
 
         CreateReviewRequest request =
-                new CreateReviewRequest();
+                CreateReviewRequest.builder()
+                        .eventId(8L)
+                        .rating(5)
+                        .comment("Updated")
+                        .build();
 
-        User currentUser = mock(User.class);
-        User reviewOwner = mock(User.class);
-        Review review = mock(Review.class);
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(anotherUser));
 
-        when(userRepository.findByEmail("user@test.com"))
-                .thenReturn(Optional.of(currentUser));
-
-        when(reviewRepository.findById(5L))
+        when(reviewRepository.findById(reviewId))
                 .thenReturn(Optional.of(review));
-
-        when(currentUser.getId())
-                .thenReturn(10L);
-
-        when(reviewOwner.getId())
-                .thenReturn(20L);
-
-        when(review.getUser())
-                .thenReturn(reviewOwner);
 
         assertThrows(
                 ReviewOwnershipException.class,
                 () -> reviewService.updateReview(
-                        5L,
+                        reviewId,
                         request,
-                        "user@test.com"
+                        email
                 )
         );
 
@@ -671,103 +704,94 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldDeleteReviewSuccessfully() {
+    void shouldDeleteOwnReview() {
 
-        User user = mock(User.class);
-        Review review = mock(Review.class);
+        Long reviewId = 10L;
+        String email = "user@test.com";
 
-        when(userRepository.findByEmail("user@test.com"))
+        User user = new User();
+        user.setId(1L);
+
+        Review review =
+                Review.builder()
+                        .id(reviewId)
+                        .user(user)
+                        .rating(5)
+                        .build();
+
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findById(5L))
+        when(reviewRepository.findById(reviewId))
                 .thenReturn(Optional.of(review));
 
-        when(user.getId())
-                .thenReturn(10L);
-
-        when(review.getUser())
-                .thenReturn(user);
-
         reviewService.deleteReview(
-                5L,
-                "user@test.com"
+                reviewId,
+                email
         );
 
-        verify(reviewRepository)
-                .delete(review);
+        verify(reviewRepository).delete(review);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenUserNotFoundWhileDeletingReview() {
+    void shouldThrowExceptionWhenReviewDoesNotExistDuringDelete() {
 
-        when(userRepository.findByEmail("unknown@test.com"))
-                .thenReturn(Optional.empty());
+        Long reviewId = 999L;
+        String email = "user@test.com";
 
-        assertThrows(
-                UserNotFoundException.class,
-                () -> reviewService.deleteReview(
-                        5L,
-                        "unknown@test.com"
-                )
-        );
+        User user = new User();
+        user.setId(1L);
 
-        verify(reviewRepository, never())
-                .findById(5L);
-    }
-
-
-    @Test
-    void shouldThrowExceptionWhenReviewNotFoundWhileDeletingReview() {
-
-        User user = mock(User.class);
-
-        when(userRepository.findByEmail("user@test.com"))
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findById(5L))
+        when(reviewRepository.findById(reviewId))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 ReviewNotFoundException.class,
                 () -> reviewService.deleteReview(
-                        5L,
-                        "user@test.com"
+                        reviewId,
+                        email
                 )
         );
 
-        verify(reviewRepository)
-                .findById(5L);
+        verify(reviewRepository, never())
+                .delete(any(Review.class));
     }
 
 
     @Test
-    void shouldThrowExceptionWhenUserDoesNotOwnReviewWhileDeleting() {
+    void shouldRejectDeletingAnotherUsersReview() {
 
-        User currentUser = mock(User.class);
-        User reviewOwner = mock(User.class);
-        Review review = mock(Review.class);
+        Long reviewId = 10L;
+        String email = "user2@test.com";
 
-        when(userRepository.findByEmail("user@test.com"))
-                .thenReturn(Optional.of(currentUser));
+        User owner = new User();
+        owner.setId(1L);
 
-        when(reviewRepository.findById(5L))
+        User anotherUser = new User();
+        anotherUser.setId(2L);
+
+        Review review =
+                Review.builder()
+                        .id(reviewId)
+                        .user(owner)
+                        .rating(5)
+                        .build();
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(anotherUser));
+
+        when(reviewRepository.findById(reviewId))
                 .thenReturn(Optional.of(review));
-
-        when(currentUser.getId())
-                .thenReturn(10L);
-
-        when(reviewOwner.getId())
-                .thenReturn(20L);
-
-        when(review.getUser())
-                .thenReturn(reviewOwner);
 
         assertThrows(
                 ReviewOwnershipException.class,
                 () -> reviewService.deleteReview(
-                        5L,
-                        "user@test.com"
+                        reviewId,
+                        email
                 )
         );
 
