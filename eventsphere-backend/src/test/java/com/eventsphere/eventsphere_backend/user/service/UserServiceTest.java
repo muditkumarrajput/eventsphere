@@ -3,6 +3,7 @@ package com.eventsphere.eventsphere_backend.user.service;
 import com.eventsphere.eventsphere_backend.common.exception.UserEmailAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.common.exception.UserHasEventsException;
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
+import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
 import com.eventsphere.eventsphere_backend.user.dto.ChangeUserRoleRequest;
 import com.eventsphere.eventsphere_backend.user.dto.UpdateUserRequest;
@@ -101,8 +102,26 @@ class UserServiceTest {
                 userService.getAllUsers();
 
         assertEquals(2, result.size());
-        assertEquals(1L, result.get(0).getId());
-        assertEquals(2L, result.get(1).getId());
+
+        assertEquals(
+                1L,
+                result.get(0).getId()
+        );
+
+        assertEquals(
+                2L,
+                result.get(1).getId()
+        );
+
+        assertEquals(
+                "user1@test.com",
+                result.get(0).getEmail()
+        );
+
+        assertEquals(
+                "user2@test.com",
+                result.get(1).getEmail()
+        );
 
         verify(userRepository).findAll();
         verify(userMapper).toResponse(user1);
@@ -138,10 +157,17 @@ class UserServiceTest {
                 userService.getCurrentUser(email);
 
         assertEquals(5L, result.getId());
-        assertEquals(email, result.getEmail());
 
-        verify(userRepository).findByEmail(email);
-        verify(userMapper).toResponse(user);
+        assertEquals(
+                email,
+                result.getEmail()
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(userMapper)
+                .toResponse(user);
     }
 
 
@@ -164,7 +190,9 @@ class UserServiceTest {
                 exception.getMessage()
         );
 
-        verify(userRepository).findByEmail(email);
+        verify(userRepository)
+                .findByEmail(email);
+
         verifyNoInteractions(userMapper);
     }
 
@@ -196,14 +224,47 @@ class UserServiceTest {
         UserResponse result =
                 userService.getUserById(id);
 
-        assertEquals(id, result.getId());
+        assertEquals(
+                id,
+                result.getId()
+        );
+
         assertEquals(
                 "user@test.com",
                 result.getEmail()
         );
 
-        verify(userRepository).findById(id);
-        verify(userMapper).toResponse(user);
+        verify(userRepository)
+                .findById(id);
+
+        verify(userMapper)
+                .toResponse(user);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenUserByIdDoesNotExist() {
+
+        Long id = 999L;
+
+        when(userRepository.findById(id))
+                .thenReturn(Optional.empty());
+
+        UserNotFoundException exception =
+                assertThrows(
+                        UserNotFoundException.class,
+                        () -> userService.getUserById(id)
+                );
+
+        assertEquals(
+                "User with id " + id + " not found.",
+                exception.getMessage()
+        );
+
+        verify(userRepository)
+                .findById(id);
+
+        verifyNoInteractions(userMapper);
     }
 
 
@@ -253,20 +314,114 @@ class UserServiceTest {
                         request
                 );
 
-        assertEquals("New Name", user.getName());
-        assertEquals(newEmail, user.getEmail());
+        assertEquals(
+                "New Name",
+                user.getName()
+        );
+
+        assertEquals(
+                newEmail,
+                user.getEmail()
+        );
+
         assertEquals(
                 "9999999999",
                 user.getPhoneNumber()
         );
 
-        assertEquals(5L, result.getId());
-        assertEquals(newEmail, result.getEmail());
+        assertEquals(
+                5L,
+                result.getId()
+        );
 
-        verify(userRepository).findByEmail(oldEmail);
-        verify(userRepository).existsByEmail(newEmail);
-        verify(userRepository).save(user);
-        verify(userMapper).toResponse(user);
+        assertEquals(
+                newEmail,
+                result.getEmail()
+        );
+
+        verify(userRepository)
+                .findByEmail(oldEmail);
+
+        verify(userRepository)
+                .existsByEmail(newEmail);
+
+        verify(userRepository)
+                .save(user);
+
+        verify(userMapper)
+                .toResponse(user);
+    }
+
+
+    @Test
+    void shouldUpdateUserWhenEmailRemainsSame() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+        user.setName("Old Name");
+        user.setEmail(email);
+        user.setPhoneNumber("1111111111");
+
+        UpdateUserRequest request =
+                new UpdateUserRequest();
+
+        request.setName("New Name");
+        request.setEmail(email);
+        request.setPhoneNumber("9999999999");
+
+        UserResponse response = UserResponse.builder()
+                .id(5L)
+                .email(email)
+                .build();
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(userRepository.save(user))
+                .thenReturn(user);
+
+        when(userMapper.toResponse(user))
+                .thenReturn(response);
+
+        UserResponse result =
+                userService.updateUser(
+                        email,
+                        request
+                );
+
+        assertEquals(
+                "New Name",
+                user.getName()
+        );
+
+        assertEquals(
+                email,
+                user.getEmail()
+        );
+
+        assertEquals(
+                "9999999999",
+                user.getPhoneNumber()
+        );
+
+        assertEquals(
+                email,
+                result.getEmail()
+        );
+
+        // existsByEmail should NOT be called
+        verify(
+                userRepository,
+                never()
+        ).existsByEmail(email);
+
+        verify(userRepository)
+                .save(user);
+
+        verify(userMapper)
+                .toResponse(user);
     }
 
 
@@ -309,11 +464,51 @@ class UserServiceTest {
                 exception.getMessage()
         );
 
-        verify(userRepository).findByEmail(email);
-        verify(userRepository).existsByEmail(existingEmail);
+        verify(userRepository)
+                .findByEmail(email);
 
-        verify(userRepository, never())
-                .save(any(User.class));
+        verify(userRepository)
+                .existsByEmail(existingEmail);
+
+        verify(
+                userRepository,
+                never()
+        ).save(any(User.class));
+
+        verifyNoInteractions(userMapper);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenUpdatingNonExistingUser() {
+
+        String email = "unknown@test.com";
+
+        UpdateUserRequest request =
+                new UpdateUserRequest();
+
+        request.setName("New Name");
+        request.setEmail("new@test.com");
+        request.setPhoneNumber("9999999999");
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> userService.updateUser(
+                        email,
+                        request
+                )
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(
+                userRepository,
+                never()
+        ).save(any(User.class));
 
         verifyNoInteractions(userMapper);
     }
@@ -356,12 +551,57 @@ class UserServiceTest {
                         request
                 );
 
-        assertEquals(Role.ORGANIZER, user.getRole());
-        assertEquals(id, result.getId());
+        assertEquals(
+                Role.ORGANIZER,
+                user.getRole()
+        );
 
-        verify(userRepository).findById(id);
-        verify(userRepository).save(user);
-        verify(userMapper).toResponse(user);
+        assertEquals(
+                id,
+                result.getId()
+        );
+
+        verify(userRepository)
+                .findById(id);
+
+        verify(userRepository)
+                .save(user);
+
+        verify(userMapper)
+                .toResponse(user);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenChangingRoleForNonExistingUser() {
+
+        Long id = 999L;
+
+        ChangeUserRoleRequest request =
+                new ChangeUserRoleRequest();
+
+        request.setRole(Role.ORGANIZER);
+
+        when(userRepository.findById(id))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> userService.changeUserRole(
+                        id,
+                        request
+                )
+        );
+
+        verify(userRepository)
+                .findById(id);
+
+        verify(
+                userRepository,
+                never()
+        ).save(any(User.class));
+
+        verifyNoInteractions(userMapper);
     }
 
 
@@ -385,9 +625,14 @@ class UserServiceTest {
 
         userService.deleteUser(id);
 
-        verify(userRepository).findById(id);
-        verify(eventRepository).findByCreatedBy(user);
-        verify(userRepository).delete(user);
+        verify(userRepository)
+                .findById(id);
+
+        verify(eventRepository)
+                .findByCreatedBy(user);
+
+        verify(userRepository)
+                .delete(user);
     }
 
 
@@ -403,9 +648,9 @@ class UserServiceTest {
                 .thenReturn(Optional.of(user));
 
         when(eventRepository.findByCreatedBy(user))
-                .thenReturn(List.of(
-                        mock(com.eventsphere.eventsphere_backend.event.entity.Event.class)
-                ));
+                .thenReturn(
+                        List.of(mock(Event.class))
+                );
 
         UserHasEventsException exception =
                 assertThrows(
@@ -420,10 +665,35 @@ class UserServiceTest {
                 exception.getMessage()
         );
 
-        verify(userRepository).findById(id);
-        verify(eventRepository).findByCreatedBy(user);
+        verify(userRepository)
+                .findById(id);
 
-        verify(userRepository, never())
-                .delete(any(User.class));
+        verify(eventRepository)
+                .findByCreatedBy(user);
+
+        verify(
+                userRepository,
+                never()
+        ).delete(any(User.class));
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenDeletingNonExistingUser() {
+
+        Long id = 999L;
+
+        when(userRepository.findById(id))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> userService.deleteUser(id)
+        );
+
+        verify(userRepository)
+                .findById(id);
+
+        verifyNoInteractions(eventRepository);
     }
 }
