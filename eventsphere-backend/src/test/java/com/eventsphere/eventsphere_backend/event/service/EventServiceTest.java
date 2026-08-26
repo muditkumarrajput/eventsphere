@@ -22,6 +22,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -30,6 +31,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -438,7 +441,8 @@ class EventServiceTest {
                 )
         );
 
-        verify(eventRepository, never()).save(any(Event.class));
+        verify(eventRepository, never())
+                .save(any(Event.class));
     }
 
 
@@ -533,7 +537,8 @@ class EventServiceTest {
                 )
         );
 
-        verify(eventRepository, never()).delete(any(Event.class));
+        verify(eventRepository, never())
+                .delete(any(Event.class));
     }
 
 
@@ -567,7 +572,10 @@ class EventServiceTest {
                 eventService.searchEvents("Java");
 
         assertEquals(1, result.size());
-        assertEquals("Java Workshop", result.get(0).getTitle());
+        assertEquals(
+                "Java Workshop",
+                result.get(0).getTitle()
+        );
 
         verify(eventRepository)
                 .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
@@ -592,8 +600,9 @@ class EventServiceTest {
                         .id(8L)
                         .build();
 
-        when(eventRepository.findByCategory(EventCategory.WORKSHOP))
-                .thenReturn(List.of(event));
+        when(eventRepository.findByCategory(
+                EventCategory.WORKSHOP
+        )).thenReturn(List.of(event));
 
         when(eventMapper.toResponse(event))
                 .thenReturn(response);
@@ -604,7 +613,10 @@ class EventServiceTest {
                 );
 
         assertEquals(1, result.size());
-        assertEquals(8L, result.get(0).getId());
+        assertEquals(
+                8L,
+                result.get(0).getId()
+        );
     }
 
 
@@ -634,7 +646,10 @@ class EventServiceTest {
                 eventService.getEventsByLocation("Mumbai");
 
         assertEquals(1, result.size());
-        assertEquals(8L, result.get(0).getId());
+        assertEquals(
+                8L,
+                result.get(0).getId()
+        );
     }
 
 
@@ -670,7 +685,10 @@ class EventServiceTest {
                 eventService.getEventsByDate(date);
 
         assertEquals(1, result.size());
-        assertEquals(8L, result.get(0).getId());
+        assertEquals(
+                8L,
+                result.get(0).getId()
+        );
     }
 
 
@@ -710,7 +728,10 @@ class EventServiceTest {
                 );
 
         assertEquals(1, result.size());
-        assertEquals(8L, result.get(0).getId());
+        assertEquals(
+                8L,
+                result.get(0).getId()
+        );
     }
 
 
@@ -742,7 +763,10 @@ class EventServiceTest {
                 eventService.getUpcomingEvents();
 
         assertEquals(1, result.size());
-        assertEquals(8L, result.get(0).getId());
+        assertEquals(
+                8L,
+                result.get(0).getId()
+        );
 
         verify(eventRepository)
                 .findByEventDateAfterOrderByEventDateAsc(
@@ -785,11 +809,175 @@ class EventServiceTest {
         Page<EventResponse> result =
                 eventService.getEvents(pageable);
 
-        assertEquals(1, result.getTotalElements());
-        assertEquals(1, result.getContent().size());
-        assertEquals(8L, result.getContent().get(0).getId());
+        assertEquals(
+                1,
+                result.getTotalElements()
+        );
 
-        verify(eventRepository).findAll(pageable);
+        assertEquals(
+                1,
+                result.getContent().size()
+        );
+
+        assertEquals(
+                8L,
+                result.getContent().get(0).getId()
+        );
+
+        verify(eventRepository)
+                .findAll(pageable);
+    }
+
+
+    // =========================================================
+    // DYNAMIC EVENT FILTERING
+    // =========================================================
+
+    @Test
+    void shouldFilterEvents() {
+
+        String keyword = "Java";
+        EventCategory category = EventCategory.WORKSHOP;
+        String location = "Mumbai";
+
+        BigDecimal minPrice =
+                new BigDecimal("500");
+
+        BigDecimal maxPrice =
+                new BigDecimal("1500");
+
+        LocalDateTime startDate =
+                LocalDateTime.of(2026, 12, 1, 0, 0);
+
+        LocalDateTime endDate =
+                LocalDateTime.of(2026, 12, 31, 23, 59);
+
+        Pageable pageable =
+                PageRequest.of(0, 5);
+
+        Event event = new Event();
+        event.setId(8L);
+
+        EventResponse response =
+                EventResponse.builder()
+                        .id(8L)
+                        .title("Java Workshop")
+                        .build();
+
+        Page<Event> eventPage =
+                new PageImpl<>(
+                        List.of(event),
+                        pageable,
+                        1
+                );
+
+        when(eventRepository.findAll(
+                any(Specification.class),
+                eq(pageable)
+        )).thenReturn(eventPage);
+
+        when(eventMapper.toResponse(event))
+                .thenReturn(response);
+
+        Page<EventResponse> result =
+                eventService.filterEvents(
+                        keyword,
+                        category,
+                        location,
+                        minPrice,
+                        maxPrice,
+                        startDate,
+                        endDate,
+                        pageable
+                );
+
+        assertEquals(
+                1,
+                result.getTotalElements()
+        );
+
+        assertEquals(
+                1,
+                result.getContent().size()
+        );
+
+        assertEquals(
+                8L,
+                result.getContent().get(0).getId()
+        );
+
+        assertEquals(
+                "Java Workshop",
+                result.getContent().get(0).getTitle()
+        );
+
+        verify(eventRepository).findAll(
+                any(Specification.class),
+                eq(pageable)
+        );
+
+        verify(eventMapper)
+                .toResponse(event);
+    }
+
+
+    @Test
+    void shouldFilterEventsWithoutOptionalFilters() {
+
+        Pageable pageable =
+                PageRequest.of(0, 10);
+
+        Event event = new Event();
+        event.setId(8L);
+
+        EventResponse response =
+                EventResponse.builder()
+                        .id(8L)
+                        .build();
+
+        Page<Event> eventPage =
+                new PageImpl<>(
+                        List.of(event),
+                        pageable,
+                        1
+                );
+
+        when(eventRepository.findAll(
+                any(Specification.class),
+                eq(pageable)
+        )).thenReturn(eventPage);
+
+        when(eventMapper.toResponse(event))
+                .thenReturn(response);
+
+        Page<EventResponse> result =
+                eventService.filterEvents(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        pageable
+                );
+
+        assertEquals(
+                1,
+                result.getTotalElements()
+        );
+
+        assertEquals(
+                8L,
+                result.getContent().get(0).getId()
+        );
+
+        verify(eventRepository).findAll(
+                any(Specification.class),
+                eq(pageable)
+        );
+
+        verify(eventMapper)
+                .toResponse(event);
     }
 }
-
