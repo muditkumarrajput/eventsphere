@@ -51,7 +51,6 @@ class PaymentServiceTest {
     @Test
     void shouldCreatePaymentSuccessfully() {
 
-        // Arrange
         String email = "user@test.com";
 
         User user = new User();
@@ -86,21 +85,26 @@ class PaymentServiceTest {
         when(paymentRepository.save(any(Payment.class)))
                 .thenReturn(savedPayment);
 
-        // Act
         PaymentResponse result =
                 paymentService.createPayment(request, email);
 
-        // Assert
         assertEquals(1L, result.getId());
+
         assertEquals(
                 "PAY-ABC12345",
                 result.getPaymentReference()
         );
-        assertEquals(10L, result.getBookingId());
+
+        assertEquals(
+                10L,
+                result.getBookingId()
+        );
+
         assertEquals(
                 new BigDecimal("2000.00"),
                 result.getAmount()
         );
+
         assertEquals(
                 PaymentStatus.PENDING,
                 result.getPaymentStatus()
@@ -115,7 +119,6 @@ class PaymentServiceTest {
     @Test
     void shouldThrowExceptionWhenBookingDoesNotExist() {
 
-        // Arrange
         String email = "user@test.com";
 
         CreatePaymentRequest request =
@@ -124,13 +127,13 @@ class PaymentServiceTest {
         when(bookingRepository.findById(999L))
                 .thenReturn(Optional.empty());
 
-        // Act + Assert
         assertThrows(
                 BookingNotFoundException.class,
                 () -> paymentService.createPayment(request, email)
         );
 
         verify(bookingRepository).findById(999L);
+
         verifyNoInteractions(paymentRepository);
     }
 
@@ -138,7 +141,6 @@ class PaymentServiceTest {
     @Test
     void shouldThrowExceptionWhenPaymentAlreadyExists() {
 
-        // Arrange
         String email = "user@test.com";
 
         User user = new User();
@@ -161,13 +163,13 @@ class PaymentServiceTest {
         when(paymentRepository.existsByBooking(booking))
                 .thenReturn(true);
 
-        // Act + Assert
         assertThrows(
                 PaymentAlreadyExistsException.class,
                 () -> paymentService.createPayment(request, email)
         );
 
         verify(paymentRepository).existsByBooking(booking);
+
         verify(paymentRepository, never())
                 .save(any(Payment.class));
     }
@@ -180,7 +182,6 @@ class PaymentServiceTest {
     @Test
     void shouldGetPaymentByIdSuccessfully() {
 
-        // Arrange
         String email = "user@test.com";
 
         User user = new User();
@@ -203,17 +204,21 @@ class PaymentServiceTest {
         when(paymentRepository.findById(1L))
                 .thenReturn(Optional.of(payment));
 
-        // Act
         PaymentResponse result =
                 paymentService.getPaymentById(1L, email);
 
-        // Assert
         assertEquals(1L, result.getId());
+
         assertEquals(
                 "PAY-ABC12345",
                 result.getPaymentReference()
         );
-        assertEquals(10L, result.getBookingId());
+
+        assertEquals(
+                10L,
+                result.getBookingId()
+        );
+
         assertEquals(
                 PaymentStatus.PENDING,
                 result.getPaymentStatus()
@@ -226,13 +231,11 @@ class PaymentServiceTest {
     @Test
     void shouldThrowExceptionWhenPaymentDoesNotExist() {
 
-        // Arrange
         String email = "user@test.com";
 
         when(paymentRepository.findById(999L))
                 .thenReturn(Optional.empty());
 
-        // Act + Assert
         assertThrows(
                 PaymentNotFoundException.class,
                 () -> paymentService.getPaymentById(999L, email)
@@ -245,7 +248,6 @@ class PaymentServiceTest {
     @Test
     void shouldNotAllowUserToAccessAnotherUsersPayment() {
 
-        // Arrange
         String ownerEmail = "owner@test.com";
         String otherEmail = "other@test.com";
 
@@ -269,7 +271,6 @@ class PaymentServiceTest {
         when(paymentRepository.findById(1L))
                 .thenReturn(Optional.of(payment));
 
-        // Act + Assert
         assertThrows(
                 BookingNotFoundException.class,
                 () -> paymentService.getPaymentById(1L, otherEmail)
@@ -286,7 +287,6 @@ class PaymentServiceTest {
     @Test
     void shouldMarkPaymentSuccessful() {
 
-        // Arrange
         String email = "user@test.com";
 
         User user = new User();
@@ -314,11 +314,9 @@ class PaymentServiceTest {
         when(paymentRepository.save(payment))
                 .thenReturn(payment);
 
-        // Act
         PaymentResponse result =
                 paymentService.markPaymentSuccessful(1L, email);
 
-        // Assert
         assertEquals(
                 PaymentStatus.SUCCESS,
                 payment.getPaymentStatus()
@@ -335,6 +333,7 @@ class PaymentServiceTest {
         );
 
         verify(bookingRepository).save(booking);
+
         verify(paymentRepository).save(payment);
 
         verify(notificationService).createNotification(
@@ -348,7 +347,6 @@ class PaymentServiceTest {
     @Test
     void shouldNotMarkAlreadySuccessfulPaymentAsSuccessfulAgain() {
 
-        // Arrange
         String email = "user@test.com";
 
         User user = new User();
@@ -369,7 +367,6 @@ class PaymentServiceTest {
         when(paymentRepository.findById(1L))
                 .thenReturn(Optional.of(payment));
 
-        // Act + Assert
         assertThrows(
                 PaymentStateTransitionException.class,
                 () -> paymentService.markPaymentSuccessful(1L, email)
@@ -389,7 +386,6 @@ class PaymentServiceTest {
     @Test
     void shouldMarkPaymentFailed() {
 
-        // Arrange
         String email = "user@test.com";
 
         User user = new User();
@@ -417,11 +413,9 @@ class PaymentServiceTest {
         when(paymentRepository.save(payment))
                 .thenReturn(payment);
 
-        // Act
         PaymentResponse result =
                 paymentService.markPaymentFailed(1L, email);
 
-        // Assert
         assertEquals(
                 PaymentStatus.FAILED,
                 payment.getPaymentStatus()
@@ -438,6 +432,7 @@ class PaymentServiceTest {
         );
 
         verify(bookingRepository).save(booking);
+
         verify(paymentRepository).save(payment);
 
         verify(notificationService).createNotification(
@@ -451,7 +446,6 @@ class PaymentServiceTest {
     @Test
     void shouldNotMarkAlreadyFailedPaymentAsFailedAgain() {
 
-        // Arrange
         String email = "user@test.com";
 
         User user = new User();
@@ -472,7 +466,6 @@ class PaymentServiceTest {
         when(paymentRepository.findById(1L))
                 .thenReturn(Optional.of(payment));
 
-        // Act + Assert
         assertThrows(
                 PaymentStateTransitionException.class,
                 () -> paymentService.markPaymentFailed(1L, email)
@@ -492,7 +485,6 @@ class PaymentServiceTest {
     @Test
     void shouldNotAllowAnotherUserToMarkPaymentSuccessful() {
 
-        // Arrange
         String ownerEmail = "owner@test.com";
         String otherEmail = "other@test.com";
 
@@ -514,7 +506,6 @@ class PaymentServiceTest {
         when(paymentRepository.findById(1L))
                 .thenReturn(Optional.of(payment));
 
-        // Act + Assert
         assertThrows(
                 BookingNotFoundException.class,
                 () -> paymentService.markPaymentSuccessful(1L, otherEmail)
@@ -530,7 +521,6 @@ class PaymentServiceTest {
     @Test
     void shouldNotAllowAnotherUserToMarkPaymentFailed() {
 
-        // Arrange
         String ownerEmail = "owner@test.com";
         String otherEmail = "other@test.com";
 
@@ -552,7 +542,6 @@ class PaymentServiceTest {
         when(paymentRepository.findById(1L))
                 .thenReturn(Optional.of(payment));
 
-        // Act + Assert
         assertThrows(
                 BookingNotFoundException.class,
                 () -> paymentService.markPaymentFailed(1L, otherEmail)
