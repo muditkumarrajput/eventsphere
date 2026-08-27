@@ -41,53 +41,118 @@ public class SecurityConfig {
             throws Exception {
 
         http
+                // =====================================================
+                // CSRF
+                // =====================================================
                 .csrf(csrf -> csrf.disable())
 
+                // =====================================================
+                // STATELESS SESSION
+                // =====================================================
                 .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
-                        .accessDeniedHandler(jwtAccessDeniedHandler)
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
                 )
 
+                // =====================================================
+                // EXCEPTION HANDLING
+                // =====================================================
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(
+                                jwtAuthenticationEntryPoint
+                        )
+                        .accessDeniedHandler(
+                                jwtAccessDeniedHandler
+                        )
+                )
+
+                // =====================================================
+                // AUTHORIZATION
+                // =====================================================
                 .authorizeHttpRequests(auth -> auth
 
+                        // -------------------------------------------------
+                        // Swagger / OpenAPI
+                        // These endpoints must be public so Swagger UI
+                        // itself can load without a JWT.
+                        // -------------------------------------------------
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**"
+                        ).permitAll()
+
+                        // -------------------------------------------------
                         // Public Authentication APIs
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // -------------------------------------------------
+                        .requestMatchers(
+                                "/api/auth/**"
+                        ).permitAll()
 
-                        // Public Event APIs
-                        .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
+                        // -------------------------------------------------
+                        // Public Event GET APIs
+                        // -------------------------------------------------
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/events/**"
+                        ).permitAll()
 
+                        // -------------------------------------------------
                         // Everything else requires authentication
+                        // -------------------------------------------------
                         .anyRequest().authenticated()
                 )
 
-                .authenticationProvider(authenticationProvider())
+                // =====================================================
+                // AUTHENTICATION PROVIDER
+                // =====================================================
+                .authenticationProvider(
+                        authenticationProvider()
+                )
 
+                // =====================================================
+                // JWT FILTER
+                // =====================================================
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
 
+                // =====================================================
+                // HTTP BASIC
+                // =====================================================
                 .httpBasic(Customizer.withDefaults());
 
         return http.build();
     }
 
+    // =========================================================
+    // AUTHENTICATION PROVIDER
+    // =========================================================
+
     @Bean
     public AuthenticationProvider authenticationProvider() {
 
         DaoAuthenticationProvider provider =
-                new DaoAuthenticationProvider(userDetailsService);
+                new DaoAuthenticationProvider(
+                        userDetailsService
+                );
 
-        provider.setPasswordEncoder(passwordEncoder());
+        provider.setPasswordEncoder(
+                passwordEncoder()
+        );
 
         return provider;
     }
 
+    // =========================================================
+    // PASSWORD ENCODER
+    // =========================================================
+
     @Bean
     public PasswordEncoder passwordEncoder() {
+
         return new BCryptPasswordEncoder();
     }
 }
