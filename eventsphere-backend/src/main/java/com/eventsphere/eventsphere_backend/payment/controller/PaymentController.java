@@ -19,7 +19,10 @@ public class PaymentController {
         this.paymentService = paymentService;
     }
 
-    // Create Payment
+    // =========================================================
+    // CREATE PAYMENT
+    // =========================================================
+
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(
             @Valid @RequestBody CreatePaymentRequest request,
@@ -31,10 +34,15 @@ public class PaymentController {
                         authentication.getName()
                 );
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity
+                .status(201)
+                .body(response);
     }
 
-    // Get Payment by ID
+    // =========================================================
+    // GET PAYMENT BY ID
+    // =========================================================
+
     @GetMapping("/{id}")
     public PaymentResponse getPaymentById(
             @PathVariable Long id,
@@ -46,7 +54,10 @@ public class PaymentController {
         );
     }
 
-    // Mark Payment as Successful
+    // =========================================================
+    // MARK PAYMENT AS SUCCESSFUL
+    // =========================================================
+
     @PatchMapping("/{id}/success")
     public PaymentResponse markPaymentSuccessful(
             @PathVariable Long id,
@@ -58,7 +69,10 @@ public class PaymentController {
         );
     }
 
-    // Mark Payment as Failed
+    // =========================================================
+    // MARK PAYMENT AS FAILED
+    // =========================================================
+
     @PatchMapping("/{id}/failure")
     public PaymentResponse markPaymentFailed(
             @PathVariable Long id,

@@ -14,6 +14,7 @@ import com.eventsphere.eventsphere_backend.payment.entity.Payment;
 import com.eventsphere.eventsphere_backend.payment.entity.PaymentStatus;
 import com.eventsphere.eventsphere_backend.payment.repository.PaymentRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -35,7 +36,10 @@ public class PaymentService {
         this.notificationService = notificationService;
     }
 
-    // Create Payment
+    // =========================================================
+    // CREATE PAYMENT
+    // =========================================================
+
     public PaymentResponse createPayment(
             CreatePaymentRequest request,
             String email) {
@@ -44,10 +48,14 @@ public class PaymentService {
                 .orElseThrow(() ->
                         new BookingNotFoundException(request.bookingId()));
 
+        // Only booking owner can create payment
         verifyBookingOwnership(booking, email);
 
+        // Prevent duplicate payment for the same booking
         if (paymentRepository.existsByBooking(booking)) {
-            throw new PaymentAlreadyExistsException(request.bookingId());
+            throw new PaymentAlreadyExistsException(
+                    request.bookingId()
+            );
         }
 
         Payment payment = Payment.builder()
@@ -58,12 +66,16 @@ public class PaymentService {
                 .booking(booking)
                 .build();
 
-        Payment savedPayment = paymentRepository.save(payment);
+        Payment savedPayment =
+                paymentRepository.save(payment);
 
         return toResponse(savedPayment);
     }
 
-    // Get Payment by ID
+    // =========================================================
+    // GET PAYMENT BY ID
+    // =========================================================
+
     public PaymentResponse getPaymentById(
             Long id,
             String email) {
@@ -72,6 +84,7 @@ public class PaymentService {
                 .orElseThrow(() ->
                         new PaymentNotFoundException(id));
 
+        // Only booking owner can view payment
         verifyBookingOwnership(
                 payment.getBooking(),
                 email
@@ -80,7 +93,11 @@ public class PaymentService {
         return toResponse(payment);
     }
 
-    // Mark Payment as Successful
+    // =========================================================
+    // MARK PAYMENT AS SUCCESSFUL
+    // =========================================================
+
+    @Transactional
     public PaymentResponse markPaymentSuccessful(
             Long id,
             String email) {
@@ -91,8 +108,10 @@ public class PaymentService {
 
         Booking booking = payment.getBooking();
 
+        // Only booking owner can update payment
         verifyBookingOwnership(booking, email);
 
+        // Only PENDING payment can become SUCCESS
         if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
 
             throw new PaymentStateTransitionException(
@@ -102,14 +121,18 @@ public class PaymentService {
             );
         }
 
+        // Update payment status
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
 
+        // Confirm booking
         booking.setBookingStatus(BookingStatus.CONFIRMED);
 
         bookingRepository.save(booking);
 
-        Payment savedPayment = paymentRepository.save(payment);
+        Payment savedPayment =
+                paymentRepository.save(payment);
 
+        // Create notification
         notificationService.createNotification(
                 booking.getUser().getId(),
                 "Payment Successful",
@@ -121,7 +144,11 @@ public class PaymentService {
         return toResponse(savedPayment);
     }
 
-    // Mark Payment as Failed
+    // =========================================================
+    // MARK PAYMENT AS FAILED
+    // =========================================================
+
+    @Transactional
     public PaymentResponse markPaymentFailed(
             Long id,
             String email) {
@@ -132,8 +159,10 @@ public class PaymentService {
 
         Booking booking = payment.getBooking();
 
+        // Only booking owner can update payment
         verifyBookingOwnership(booking, email);
 
+        // Only PENDING payment can become FAILED
         if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
 
             throw new PaymentStateTransitionException(
@@ -143,14 +172,18 @@ public class PaymentService {
             );
         }
 
+        // Update payment status
         payment.setPaymentStatus(PaymentStatus.FAILED);
 
+        // Cancel booking
         booking.setBookingStatus(BookingStatus.CANCELLED);
 
         bookingRepository.save(booking);
 
-        Payment savedPayment = paymentRepository.save(payment);
+        Payment savedPayment =
+                paymentRepository.save(payment);
 
+        // Create notification
         notificationService.createNotification(
                 booking.getUser().getId(),
                 "Payment Failed",
@@ -162,20 +195,27 @@ public class PaymentService {
         return toResponse(savedPayment);
     }
 
-    // Verify Booking Ownership
+    // =========================================================
+    // VERIFY BOOKING OWNERSHIP
+    // =========================================================
+
     private void verifyBookingOwnership(
             Booking booking,
             String email) {
 
         if (!booking.getUser().getEmail().equals(email)) {
 
+            // Hide existence of another user's booking
             throw new BookingNotFoundException(
                     booking.getId()
             );
         }
     }
 
-    // Convert Entity to Response
+    // =========================================================
+    // ENTITY → RESPONSE
+    // =========================================================
+
     private PaymentResponse toResponse(
             Payment payment) {
 
@@ -191,7 +231,10 @@ public class PaymentService {
                 .build();
     }
 
-    // Generate Payment Reference
+    // =========================================================
+    // GENERATE PAYMENT REFERENCE
+    // =========================================================
+
     private String generatePaymentReference() {
 
         return "PAY-" +
