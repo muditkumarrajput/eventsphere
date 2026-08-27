@@ -3,7 +3,9 @@ package com.eventsphere.eventsphere_backend.auth.service;
 import com.eventsphere.eventsphere_backend.auth.dto.AuthResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.LoginRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterRequest;
+import com.eventsphere.eventsphere_backend.auth.dto.RegisterResponse;
 import com.eventsphere.eventsphere_backend.auth.security.JwtService;
+import com.eventsphere.eventsphere_backend.common.exception.UserEmailAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
@@ -27,39 +29,66 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
-    // Register
-    public User register(RegisterRequest request) {
+    // =========================================================
+    // REGISTER
+    // =========================================================
+
+    public RegisterResponse register(RegisterRequest request) {
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new UserEmailAlreadyExistsException(
+                    request.getEmail()
+            );
         }
 
         User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
+                .password(
+                        passwordEncoder.encode(
+                                request.getPassword()
+                        )
+                )
                 .phoneNumber(request.getPhoneNumber())
                 .role(Role.USER)
                 .build();
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        return RegisterResponse.builder()
+                .id(savedUser.getId())
+                .name(savedUser.getName())
+                .email(savedUser.getEmail())
+                .phoneNumber(savedUser.getPhoneNumber())
+                .role(savedUser.getRole())
+                .createdAt(savedUser.getCreatedAt())
+                .build();
     }
 
-    // Login
+    // =========================================================
+    // LOGIN
+    // =========================================================
+
     public AuthResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() ->
-                        new RuntimeException("Invalid email or password"));
+                        new RuntimeException(
+                                "Invalid email or password"
+                        )
+                );
 
         if (!passwordEncoder.matches(
                 request.getPassword(),
                 user.getPassword())) {
 
-            throw new RuntimeException("Invalid email or password");
+            throw new RuntimeException(
+                    "Invalid email or password"
+            );
         }
 
-        String token = jwtService.generateToken(user.getEmail());
+        String token =
+                jwtService.generateToken(user.getEmail());
 
         return AuthResponse.builder()
                 .token(token)
