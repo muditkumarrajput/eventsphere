@@ -6,12 +6,17 @@ import com.eventsphere.eventsphere_backend.booking.entity.Booking;
 import com.eventsphere.eventsphere_backend.booking.entity.BookingStatus;
 import com.eventsphere.eventsphere_backend.booking.mapper.BookingMapper;
 import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
-import com.eventsphere.eventsphere_backend.common.exception.*;
+import com.eventsphere.eventsphere_backend.common.exception.BookingAlreadyCancelledException;
+import com.eventsphere.eventsphere_backend.common.exception.BookingNotFoundException;
+import com.eventsphere.eventsphere_backend.common.exception.EventCapacityExceededException;
+import com.eventsphere.eventsphere_backend.common.exception.EventNotFoundException;
+import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -39,32 +44,44 @@ public class BookingService {
         this.bookingMapper = bookingMapper;
     }
 
-    // Create Booking
+    // =========================================================
+    // CREATE BOOKING
+    // =========================================================
+
+    @Transactional
     public BookingResponse createBooking(
             CreateBookingRequest request,
             String email) {
 
+        // Find user
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() ->
                         new UserNotFoundException(email));
 
-        Event event = eventRepository.findById(request.getEventId())
+        // Lock event row while checking capacity
+        Event event = eventRepository.findByIdForUpdate(
+                        request.getEventId()
+                )
                 .orElseThrow(() ->
-                        new EventNotFoundException(request.getEventId()));
+                        new EventNotFoundException(
+                                request.getEventId()
+                        ));
 
-        // Calculate booked and available seats
+        // Calculate currently booked tickets
         Integer bookedTickets =
                 bookingRepository.getBookedTickets(event.getId());
 
+        // Calculate available seats
         int availableSeats =
                 event.getCapacity() - bookedTickets;
 
         // Validate requested tickets
         if (request.getNumberOfTickets() > availableSeats) {
+
             throw new EventCapacityExceededException();
         }
 
-        // Calculate total booking amount
+        // Calculate total amount
         BigDecimal totalAmount =
                 event.getTicketPrice()
                         .multiply(
@@ -75,11 +92,15 @@ public class BookingService {
 
         // Create booking
         Booking booking = Booking.builder()
-                .bookingReference(generateBookingReference())
-                .numberOfTickets(request.getNumberOfTickets())
+                .bookingReference(
+                        generateBookingReference()
+                )
+                .numberOfTickets(
+                        request.getNumberOfTickets()
+                )
                 .totalAmount(totalAmount)
 
-                // Booking is pending until payment succeeds
+                // Payment must succeed before confirmation
                 .bookingStatus(BookingStatus.PENDING)
 
                 .bookingDate(LocalDateTime.now())
@@ -87,22 +108,30 @@ public class BookingService {
                 .event(event)
                 .build();
 
+        // Save booking
         Booking savedBooking =
                 bookingRepository.save(booking);
 
         return bookingMapper.toResponse(savedBooking);
     }
 
-    // Get All Bookings
+    // =========================================================
+    // GET ALL BOOKINGS
+    // =========================================================
+
     public List<BookingResponse> getAllBookings() {
 
-        return bookingRepository.findAllByOrderByCreatedAtDesc()
+        return bookingRepository
+                .findAllByOrderByCreatedAtDesc()
                 .stream()
                 .map(bookingMapper::toResponse)
                 .collect(Collectors.toList());
     }
 
-    // Get My Bookings
+    // =========================================================
+    // GET MY BOOKINGS
+    // =========================================================
+
     public List<BookingResponse> getMyBookings(
             String email) {
 
@@ -117,7 +146,10 @@ public class BookingService {
                 .collect(Collectors.toList());
     }
 
-    // Get Booking By ID
+    // =========================================================
+    // GET BOOKING BY ID
+    // =========================================================
+
     public BookingResponse getBookingById(
             Long id,
             String email) {
@@ -130,15 +162,22 @@ public class BookingService {
                 .orElseThrow(() ->
                         new BookingNotFoundException(id));
 
-        // Check booking ownership
-        if (!booking.getUser().getId().equals(user.getId())) {
+        // Ownership check
+        if (!booking.getUser().getId()
+                .equals(user.getId())) {
+
+            // Hide another user's booking
             throw new BookingNotFoundException(id);
         }
 
         return bookingMapper.toResponse(booking);
     }
 
-    // Cancel Booking
+    // =========================================================
+    // CANCEL BOOKING
+    // =========================================================
+
+    @Transactional
     public void cancelBooking(
             Long id,
             String email) {
@@ -151,18 +190,22 @@ public class BookingService {
                 .orElseThrow(() ->
                         new BookingNotFoundException(id));
 
-        // Check booking ownership
-        if (!booking.getUser().getId().equals(user.getId())) {
+        // Ownership check
+        if (!booking.getUser().getId()
+                .equals(user.getId())) {
+
+            // Hide another user's booking
             throw new BookingNotFoundException(id);
         }
 
-        // Prevent cancelling an already cancelled booking
-        if (booking.getBookingStatus() ==
-                BookingStatus.CANCELLED) {
+        // Prevent duplicate cancellation
+        if (booking.getBookingStatus()
+                == BookingStatus.CANCELLED) {
 
             throw new BookingAlreadyCancelledException(id);
         }
 
+        // Cancel booking
         booking.setBookingStatus(
                 BookingStatus.CANCELLED
         );
@@ -170,7 +213,10 @@ public class BookingService {
         bookingRepository.save(booking);
     }
 
-    // Generate Booking Reference
+    // =========================================================
+    // GENERATE BOOKING REFERENCE
+    // =========================================================
+
     private String generateBookingReference() {
 
         return "EVT-" +

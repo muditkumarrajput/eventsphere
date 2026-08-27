@@ -93,7 +93,9 @@ class BookingServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(3L))
+        // IMPORTANT:
+        // BookingService now uses findByIdForUpdate()
+        when(eventRepository.findByIdForUpdate(3L))
                 .thenReturn(Optional.of(event));
 
         when(bookingRepository.getBookedTickets(3L))
@@ -110,17 +112,38 @@ class BookingServiceTest {
                 bookingService.createBooking(request, email);
 
         // Assert
-        assertEquals(1L, result.getId());
-        assertEquals("EVT-ABC12345", result.getBookingReference());
-        assertEquals(2, result.getNumberOfTickets());
+        assertNotNull(result);
+
+        assertEquals(
+                1L,
+                result.getId()
+        );
+
+        assertEquals(
+                "EVT-ABC12345",
+                result.getBookingReference()
+        );
+
+        assertEquals(
+                2,
+                result.getNumberOfTickets()
+        );
+
         assertEquals(
                 new BigDecimal("2998.00"),
                 result.getTotalAmount()
         );
+
         assertEquals(
                 BookingStatus.PENDING,
                 result.getBookingStatus()
         );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(eventRepository)
+                .findByIdForUpdate(3L);
 
         verify(bookingRepository)
                 .getBookedTickets(3L);
@@ -189,7 +212,9 @@ class BookingServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(99L))
+        // IMPORTANT:
+        // BookingService now uses findByIdForUpdate()
+        when(eventRepository.findByIdForUpdate(99L))
                 .thenReturn(Optional.empty());
 
         // Act + Assert
@@ -207,8 +232,11 @@ class BookingServiceTest {
                 exception.getMessage()
         );
 
+        verify(userRepository)
+                .findByEmail(email);
+
         verify(eventRepository)
-                .findById(99L);
+                .findByIdForUpdate(99L);
 
         verifyNoInteractions(bookingRepository);
     }
@@ -237,7 +265,9 @@ class BookingServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(3L))
+        // IMPORTANT:
+        // BookingService now uses findByIdForUpdate()
+        when(eventRepository.findByIdForUpdate(3L))
                 .thenReturn(Optional.of(event));
 
         // 8 already booked -> only 2 seats available
@@ -253,11 +283,16 @@ class BookingServiceTest {
                 )
         );
 
+        verify(eventRepository)
+                .findByIdForUpdate(3L);
+
         verify(bookingRepository)
                 .getBookedTickets(3L);
 
         verify(bookingRepository, never())
                 .save(any(Booking.class));
+
+        verifyNoInteractions(bookingMapper);
     }
 
 
@@ -301,9 +336,22 @@ class BookingServiceTest {
                 bookingService.getAllBookings();
 
         // Assert
-        assertEquals(2, result.size());
-        assertEquals(1L, result.get(0).getId());
-        assertEquals(2L, result.get(1).getId());
+        assertNotNull(result);
+
+        assertEquals(
+                2,
+                result.size()
+        );
+
+        assertEquals(
+                1L,
+                result.get(0).getId()
+        );
+
+        assertEquals(
+                2L,
+                result.get(1).getId()
+        );
 
         verify(bookingRepository)
                 .findAllByOrderByCreatedAtDesc();
@@ -353,8 +401,17 @@ class BookingServiceTest {
                 bookingService.getMyBookings(email);
 
         // Assert
-        assertEquals(1, result.size());
-        assertEquals(1L, result.get(0).getId());
+        assertNotNull(result);
+
+        assertEquals(
+                1,
+                result.size()
+        );
+
+        assertEquals(
+                1L,
+                result.get(0).getId()
+        );
 
         verify(userRepository)
                 .findByEmail(email);
@@ -426,7 +483,15 @@ class BookingServiceTest {
                 bookingService.getBookingById(1L, email);
 
         // Assert
-        assertEquals(1L, result.getId());
+        assertNotNull(result);
+
+        assertEquals(
+                1L,
+                result.getId()
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
 
         verify(bookingRepository)
                 .findById(1L);
@@ -462,8 +527,14 @@ class BookingServiceTest {
         // Act + Assert
         assertThrows(
                 BookingNotFoundException.class,
-                () -> bookingService.getBookingById(1L, email)
+                () -> bookingService.getBookingById(
+                        1L,
+                        email
+                )
         );
+
+        verify(userRepository)
+                .findByEmail(email);
 
         verify(bookingRepository)
                 .findById(1L);
@@ -490,11 +561,19 @@ class BookingServiceTest {
         // Act + Assert
         assertThrows(
                 BookingNotFoundException.class,
-                () -> bookingService.getBookingById(99L, email)
+                () -> bookingService.getBookingById(
+                        99L,
+                        email
+                )
         );
+
+        verify(userRepository)
+                .findByEmail(email);
 
         verify(bookingRepository)
                 .findById(99L);
+
+        verifyNoInteractions(bookingMapper);
     }
 
 
@@ -524,13 +603,22 @@ class BookingServiceTest {
                 .thenReturn(Optional.of(booking));
 
         // Act
-        bookingService.cancelBooking(1L, email);
+        bookingService.cancelBooking(
+                1L,
+                email
+        );
 
         // Assert
         assertEquals(
                 BookingStatus.CANCELLED,
                 booking.getBookingStatus()
         );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(bookingRepository)
+                .findById(1L);
 
         verify(bookingRepository)
                 .save(booking);
@@ -561,8 +649,17 @@ class BookingServiceTest {
         // Act + Assert
         assertThrows(
                 BookingAlreadyCancelledException.class,
-                () -> bookingService.cancelBooking(1L, email)
+                () -> bookingService.cancelBooking(
+                        1L,
+                        email
+                )
         );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(bookingRepository)
+                .findById(1L);
 
         verify(bookingRepository, never())
                 .save(any(Booking.class));
@@ -596,8 +693,17 @@ class BookingServiceTest {
         // Act + Assert
         assertThrows(
                 BookingNotFoundException.class,
-                () -> bookingService.cancelBooking(1L, email)
+                () -> bookingService.cancelBooking(
+                        1L,
+                        email
+                )
         );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(bookingRepository)
+                .findById(1L);
 
         verify(bookingRepository, never())
                 .save(any(Booking.class));
@@ -622,8 +728,14 @@ class BookingServiceTest {
         // Act + Assert
         assertThrows(
                 BookingNotFoundException.class,
-                () -> bookingService.cancelBooking(99L, email)
+                () -> bookingService.cancelBooking(
+                        99L,
+                        email
+                )
         );
+
+        verify(userRepository)
+                .findByEmail(email);
 
         verify(bookingRepository)
                 .findById(99L);

@@ -4,6 +4,7 @@ import com.eventsphere.eventsphere_backend.booking.dto.BookingResponse;
 import com.eventsphere.eventsphere_backend.booking.dto.CreateBookingRequest;
 import com.eventsphere.eventsphere_backend.booking.service.BookingService;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -90,7 +91,7 @@ public class BookingController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public void cancelBooking(
+    public ResponseEntity<Void> cancelBooking(
             @PathVariable Long id,
             Authentication authentication) {
 
@@ -98,5 +99,7 @@ public class BookingController {
                 id,
                 authentication.getName()
         );
+
+        return ResponseEntity.noContent().build();
     }
 }
