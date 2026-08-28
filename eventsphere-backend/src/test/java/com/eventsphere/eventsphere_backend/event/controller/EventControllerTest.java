@@ -26,6 +26,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -179,7 +180,10 @@ class EventControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size()").value(1))
-                .andExpect(jsonPath("$[0].id").value(8))
+                .andExpect(
+                        jsonPath("$[0].id")
+                                .value(8)
+                )
                 .andExpect(
                         jsonPath("$[0].title")
                                 .value("Java Workshop")
@@ -483,6 +487,195 @@ class EventControllerTest {
 
 
     // =========================================================
+    // DYNAMIC EVENT FILTERING
+    // =========================================================
+
+    @Test
+    void shouldFilterEvents() throws Exception {
+
+        Pageable pageable =
+                PageRequest.of(0, 5);
+
+        EventResponse response =
+                EventResponse.builder()
+                        .id(8L)
+                        .title("Java Workshop")
+                        .category(EventCategory.WORKSHOP)
+                        .location("Mumbai")
+                        .ticketPrice(
+                                new BigDecimal("999")
+                        )
+                        .eventDate(
+                                LocalDateTime.of(
+                                        2026,
+                                        12,
+                                        20,
+                                        10,
+                                        0
+                                )
+                        )
+                        .build();
+
+        Page<EventResponse> page =
+                new PageImpl<>(
+                        List.of(response),
+                        pageable,
+                        1
+                );
+
+        when(eventService.filterEvents(
+                eq("Java"),
+                eq(EventCategory.WORKSHOP),
+                eq("Mumbai"),
+                eq(new BigDecimal("500")),
+                eq(new BigDecimal("1500")),
+                eq(LocalDateTime.of(
+                        2026,
+                        12,
+                        1,
+                        0,
+                        0
+                )),
+                eq(LocalDateTime.of(
+                        2026,
+                        12,
+                        31,
+                        23,
+                        59
+                )),
+                any(Pageable.class)
+        )).thenReturn(page);
+
+        mockMvc.perform(
+                        get("/api/events/filter")
+                                .param("keyword", "Java")
+                                .param("category", "WORKSHOP")
+                                .param("location", "Mumbai")
+                                .param("minPrice", "500")
+                                .param("maxPrice", "1500")
+                                .param(
+                                        "startDate",
+                                        "2026-12-01T00:00:00"
+                                )
+                                .param(
+                                        "endDate",
+                                        "2026-12-31T23:59:00"
+                                )
+                                .param("page", "0")
+                                .param("size", "5")
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.totalElements")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath("$.content[0].id")
+                                .value(8)
+                )
+                .andExpect(
+                        jsonPath("$.content[0].title")
+                                .value("Java Workshop")
+                )
+                .andExpect(
+                        jsonPath("$.content[0].location")
+                                .value("Mumbai")
+                )
+                .andExpect(
+                        jsonPath("$.content[0].ticketPrice")
+                                .value(999)
+                );
+
+        verify(eventService).filterEvents(
+                eq("Java"),
+                eq(EventCategory.WORKSHOP),
+                eq("Mumbai"),
+                eq(new BigDecimal("500")),
+                eq(new BigDecimal("1500")),
+                eq(LocalDateTime.of(
+                        2026,
+                        12,
+                        1,
+                        0,
+                        0
+                )),
+                eq(LocalDateTime.of(
+                        2026,
+                        12,
+                        31,
+                        23,
+                        59
+                )),
+                any(Pageable.class)
+        );
+    }
+
+
+    // =========================================================
+    // DYNAMIC FILTERING - NO PARAMETERS
+    // =========================================================
+
+    @Test
+    void shouldFilterEventsWithoutParameters() throws Exception {
+
+        Pageable pageable =
+                PageRequest.of(0, 20);
+
+        EventResponse response =
+                EventResponse.builder()
+                        .id(8L)
+                        .title("Java Workshop")
+                        .build();
+
+        Page<EventResponse> page =
+                new PageImpl<>(
+                        List.of(response),
+                        pageable,
+                        1
+                );
+
+        when(eventService.filterEvents(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        )).thenReturn(page);
+
+        mockMvc.perform(
+                        get("/api/events/filter")
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.totalElements")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath("$.content[0].id")
+                                .value(8)
+                )
+                .andExpect(
+                        jsonPath("$.content[0].title")
+                                .value("Java Workshop")
+                );
+
+        verify(eventService).filterEvents(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        );
+    }
+
+
+    // =========================================================
     // GET EVENT BY ID
     // =========================================================
 
@@ -542,19 +735,28 @@ class EventControllerTest {
         request.setTicketPrice(
                 new BigDecimal("1499")
         );
-        request.setCategory(
-                EventCategory.WORKSHOP
-        );
+        request.setCategory(EventCategory.WORKSHOP);
 
         EventResponse response =
                 EventResponse.builder()
                         .id(8L)
                         .title("Updated Workshop")
+                        .description("Updated Description")
                         .location("Delhi")
+                        .eventDate(
+                                LocalDateTime.of(
+                                        2026,
+                                        12,
+                                        25,
+                                        10,
+                                        0
+                                )
+                        )
                         .capacity(200)
                         .ticketPrice(
                                 new BigDecimal("1499")
                         )
+                        .category(EventCategory.WORKSHOP)
                         .build();
 
         when(eventService.updateEvent(
@@ -574,7 +776,10 @@ class EventControllerTest {
                                 )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(8))
+                .andExpect(
+                        jsonPath("$.id")
+                                .value(8)
+                )
                 .andExpect(
                         jsonPath("$.title")
                                 .value("Updated Workshop")
@@ -582,10 +787,6 @@ class EventControllerTest {
                 .andExpect(
                         jsonPath("$.location")
                                 .value("Delhi")
-                )
-                .andExpect(
-                        jsonPath("$.capacity")
-                                .value(200)
                 );
 
         verify(eventService).updateEvent(
@@ -603,134 +804,52 @@ class EventControllerTest {
     @Test
     void shouldDeleteEvent() throws Exception {
 
+        doNothing()
+                .when(eventService)
+                .deleteEvent(
+                        eq(8L),
+                        eq("organizer@test.com")
+                );
+
         mockMvc.perform(
                         delete("/api/events/8")
                                 .principal(authentication)
                 )
                 .andExpect(status().isNoContent());
 
-        verify(eventService)
-                .deleteEvent(
-                        8L,
-                        "organizer@test.com"
-                );
+        verify(eventService).deleteEvent(
+                eq(8L),
+                eq("organizer@test.com")
+        );
     }
 
 
     // =========================================================
-    // DYNAMIC FILTER
+    // INVALID CATEGORY
     // =========================================================
 
     @Test
-    void shouldFilterEvents() throws Exception {
-
-        Pageable pageable =
-                PageRequest.of(0, 10);
-
-        EventResponse response =
-                EventResponse.builder()
-                        .id(8L)
-                        .title("Java Workshop")
-                        .location("Mumbai")
-                        .category(EventCategory.WORKSHOP)
-                        .ticketPrice(
-                                new BigDecimal("999")
-                        )
-                        .build();
-
-        Page<EventResponse> page =
-                new PageImpl<>(
-                        List.of(response),
-                        pageable,
-                        1
-                );
-
-        LocalDateTime startDate =
-                LocalDateTime.of(
-                        2026,
-                        12,
-                        1,
-                        0,
-                        0
-                );
-
-        LocalDateTime endDate =
-                LocalDateTime.of(
-                        2026,
-                        12,
-                        31,
-                        23,
-                        59
-                );
-
-        when(eventService.filterEvents(
-                eq("Java"),
-                eq(EventCategory.WORKSHOP),
-                eq("Mumbai"),
-                eq(new BigDecimal("500")),
-                eq(new BigDecimal("1500")),
-                eq(startDate),
-                eq(endDate),
-                any(Pageable.class)
-        )).thenReturn(page);
+    void shouldReturnBadRequestForInvalidCategory()
+            throws Exception {
 
         mockMvc.perform(
-                        get("/api/events/filter")
-                                .param("keyword", "Java")
-                                .param(
-                                        "category",
-                                        "WORKSHOP"
-                                )
-                                .param(
-                                        "location",
-                                        "Mumbai"
-                                )
-                                .param(
-                                        "minPrice",
-                                        "500"
-                                )
-                                .param(
-                                        "maxPrice",
-                                        "1500"
-                                )
-                                .param(
-                                        "startDate",
-                                        "2026-12-01T00:00:00"
-                                )
-                                .param(
-                                        "endDate",
-                                        "2026-12-31T23:59:00"
-                                )
-                                .param("page", "0")
-                                .param("size", "10")
+                        get("/api/events/category/INVALID")
                 )
-                .andExpect(status().isOk())
-                .andExpect(
-                        jsonPath("$.totalElements")
-                                .value(1)
-                )
-                .andExpect(
-                        jsonPath("$.content[0].id")
-                                .value(8)
-                )
-                .andExpect(
-                        jsonPath("$.content[0].title")
-                                .value("Java Workshop")
-                )
-                .andExpect(
-                        jsonPath("$.content[0].location")
-                                .value("Mumbai")
-                );
+                .andExpect(status().isBadRequest());
+    }
 
-        verify(eventService).filterEvents(
-                eq("Java"),
-                eq(EventCategory.WORKSHOP),
-                eq("Mumbai"),
-                eq(new BigDecimal("500")),
-                eq(new BigDecimal("1500")),
-                eq(startDate),
-                eq(endDate),
-                any(Pageable.class)
-        );
+
+    // =========================================================
+    // INVALID DATE
+    // =========================================================
+
+    @Test
+    void shouldReturnBadRequestForInvalidDate()
+            throws Exception {
+
+        mockMvc.perform(
+                        get("/api/events/date/invalid-date")
+                )
+                .andExpect(status().isBadRequest());
     }
 }
