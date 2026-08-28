@@ -360,10 +360,7 @@ class UserControllerTest {
                                 .with(user("admin").roles("ADMIN"))
                 )
 
-                .andExpect(status().isOk())
-
-                .andExpect(jsonPath("$")
-                        .value("User deleted successfully"));
+                .andExpect(status().isNoContent());
     }
 
 
