@@ -5,6 +5,7 @@ import com.eventsphere.eventsphere_backend.auth.dto.LoginRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterResponse;
 import com.eventsphere.eventsphere_backend.auth.security.JwtService;
+import com.eventsphere.eventsphere_backend.common.exception.InvalidCredentialsException;
 import com.eventsphere.eventsphere_backend.common.exception.UserEmailAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
@@ -230,9 +231,9 @@ class AuthServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.empty());
 
-        RuntimeException exception =
+        InvalidCredentialsException exception =
                 assertThrows(
-                        RuntimeException.class,
+                        InvalidCredentialsException.class,
                         () -> authService.login(request)
                 );
 
@@ -278,9 +279,9 @@ class AuthServiceTest {
                 encodedPassword
         )).thenReturn(false);
 
-        RuntimeException exception =
+        InvalidCredentialsException exception =
                 assertThrows(
-                        RuntimeException.class,
+                        InvalidCredentialsException.class,
                         () -> authService.login(request)
                 );
 
