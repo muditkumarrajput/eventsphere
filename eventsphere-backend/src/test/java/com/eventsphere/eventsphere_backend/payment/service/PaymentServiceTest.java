@@ -24,9 +24,13 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
@@ -86,9 +90,17 @@ class PaymentServiceTest {
                 .thenReturn(savedPayment);
 
         PaymentResponse result =
-                paymentService.createPayment(request, email);
+                paymentService.createPayment(
+                        request,
+                        email
+                );
 
-        assertEquals(1L, result.getId());
+        assertNotNull(result);
+
+        assertEquals(
+                1L,
+                result.getId()
+        );
 
         assertEquals(
                 "PAY-ABC12345",
@@ -110,14 +122,19 @@ class PaymentServiceTest {
                 result.getPaymentStatus()
         );
 
-        verify(bookingRepository).findById(10L);
-        verify(paymentRepository).existsByBooking(booking);
-        verify(paymentRepository).save(any(Payment.class));
+        verify(bookingRepository)
+                .findById(10L);
+
+        verify(paymentRepository)
+                .existsByBooking(booking);
+
+        verify(paymentRepository)
+                .save(any(Payment.class));
     }
 
 
     @Test
-    void shouldThrowExceptionWhenBookingDoesNotExist() {
+    void shouldThrowExceptionWhenBookingDoesNotExistDuringCreatePayment() {
 
         String email = "user@test.com";
 
@@ -129,12 +146,63 @@ class PaymentServiceTest {
 
         assertThrows(
                 BookingNotFoundException.class,
-                () -> paymentService.createPayment(request, email)
+                () -> paymentService.createPayment(
+                        request,
+                        email
+                )
         );
 
-        verify(bookingRepository).findById(999L);
+        verify(bookingRepository)
+                .findById(999L);
 
         verifyNoInteractions(paymentRepository);
+    }
+
+
+    @Test
+    void shouldRejectPaymentWhenUserDoesNotOwnBooking() {
+
+        String ownerEmail = "owner@test.com";
+        String otherEmail = "other@test.com";
+
+        User owner = new User();
+        owner.setId(5L);
+        owner.setEmail(ownerEmail);
+
+        Booking booking = Booking.builder()
+                .id(10L)
+                .bookingReference("EVT-ABC12345")
+                .totalAmount(new BigDecimal("2000.00"))
+                .bookingStatus(BookingStatus.PENDING)
+                .user(owner)
+                .build();
+
+        CreatePaymentRequest request =
+                new CreatePaymentRequest(10L);
+
+        when(bookingRepository.findById(10L))
+                .thenReturn(Optional.of(booking));
+
+        assertThrows(
+                BookingNotFoundException.class,
+                () -> paymentService.createPayment(
+                        request,
+                        otherEmail
+                )
+        );
+
+        verify(bookingRepository)
+                .findById(10L);
+
+        verify(
+                paymentRepository,
+                never()
+        ).existsByBooking(booking);
+
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
     }
 
 
@@ -149,6 +217,7 @@ class PaymentServiceTest {
 
         Booking booking = Booking.builder()
                 .id(10L)
+                .bookingReference("EVT-ABC12345")
                 .totalAmount(new BigDecimal("2000.00"))
                 .bookingStatus(BookingStatus.PENDING)
                 .user(user)
@@ -165,18 +234,27 @@ class PaymentServiceTest {
 
         assertThrows(
                 PaymentAlreadyExistsException.class,
-                () -> paymentService.createPayment(request, email)
+                () -> paymentService.createPayment(
+                        request,
+                        email
+                )
         );
 
-        verify(paymentRepository).existsByBooking(booking);
+        verify(bookingRepository)
+                .findById(10L);
 
-        verify(paymentRepository, never())
-                .save(any(Payment.class));
+        verify(paymentRepository)
+                .existsByBooking(booking);
+
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
     }
 
 
     // =========================================================
-    // GET PAYMENT
+    // GET PAYMENT BY ID
     // =========================================================
 
     @Test
@@ -205,9 +283,17 @@ class PaymentServiceTest {
                 .thenReturn(Optional.of(payment));
 
         PaymentResponse result =
-                paymentService.getPaymentById(1L, email);
+                paymentService.getPaymentById(
+                        1L,
+                        email
+                );
 
-        assertEquals(1L, result.getId());
+        assertNotNull(result);
+
+        assertEquals(
+                1L,
+                result.getId()
+        );
 
         assertEquals(
                 "PAY-ABC12345",
@@ -220,11 +306,17 @@ class PaymentServiceTest {
         );
 
         assertEquals(
+                new BigDecimal("2000.00"),
+                result.getAmount()
+        );
+
+        assertEquals(
                 PaymentStatus.PENDING,
                 result.getPaymentStatus()
         );
 
-        verify(paymentRepository).findById(1L);
+        verify(paymentRepository)
+                .findById(1L);
     }
 
 
@@ -238,10 +330,16 @@ class PaymentServiceTest {
 
         assertThrows(
                 PaymentNotFoundException.class,
-                () -> paymentService.getPaymentById(999L, email)
+                () -> paymentService.getPaymentById(
+                        999L,
+                        email
+                )
         );
 
-        verify(paymentRepository).findById(999L);
+        verify(paymentRepository)
+                .findById(999L);
+
+        verifyNoInteractions(notificationService);
     }
 
 
@@ -273,10 +371,14 @@ class PaymentServiceTest {
 
         assertThrows(
                 BookingNotFoundException.class,
-                () -> paymentService.getPaymentById(1L, otherEmail)
+                () -> paymentService.getPaymentById(
+                        1L,
+                        otherEmail
+                )
         );
 
-        verify(paymentRepository).findById(1L);
+        verify(paymentRepository)
+                .findById(1L);
     }
 
 
@@ -315,7 +417,10 @@ class PaymentServiceTest {
                 .thenReturn(payment);
 
         PaymentResponse result =
-                paymentService.markPaymentSuccessful(1L, email);
+                paymentService.markPaymentSuccessful(
+                        1L,
+                        email
+                );
 
         assertEquals(
                 PaymentStatus.SUCCESS,
@@ -332,15 +437,31 @@ class PaymentServiceTest {
                 result.getPaymentStatus()
         );
 
-        verify(bookingRepository).save(booking);
-
-        verify(paymentRepository).save(payment);
-
-        verify(notificationService).createNotification(
-                5L,
-                "Payment Successful",
-                "Your payment for booking EVT-ABC12345 was successful."
+        assertEquals(
+                1L,
+                result.getId()
         );
+
+        assertEquals(
+                10L,
+                result.getBookingId()
+        );
+
+        verify(paymentRepository)
+                .findById(1L);
+
+        verify(bookingRepository)
+                .save(booking);
+
+        verify(paymentRepository)
+                .save(payment);
+
+        verify(notificationService)
+                .createNotification(
+                        5L,
+                        "Payment Successful",
+                        "Your payment for booking EVT-ABC12345 was successful."
+                );
     }
 
 
@@ -369,13 +490,24 @@ class PaymentServiceTest {
 
         assertThrows(
                 PaymentStateTransitionException.class,
-                () -> paymentService.markPaymentSuccessful(1L, email)
+                () -> paymentService.markPaymentSuccessful(
+                        1L,
+                        email
+                )
         );
 
-        verify(paymentRepository, never())
-                .save(any(Payment.class));
+        verify(paymentRepository)
+                .findById(1L);
 
-        verifyNoInteractions(notificationService);
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                bookingRepository,
+                notificationService
+        );
     }
 
 
@@ -414,7 +546,10 @@ class PaymentServiceTest {
                 .thenReturn(payment);
 
         PaymentResponse result =
-                paymentService.markPaymentFailed(1L, email);
+                paymentService.markPaymentFailed(
+                        1L,
+                        email
+                );
 
         assertEquals(
                 PaymentStatus.FAILED,
@@ -431,15 +566,31 @@ class PaymentServiceTest {
                 result.getPaymentStatus()
         );
 
-        verify(bookingRepository).save(booking);
-
-        verify(paymentRepository).save(payment);
-
-        verify(notificationService).createNotification(
-                5L,
-                "Payment Failed",
-                "Your payment for booking EVT-ABC12345 failed. Your booking has been cancelled."
+        assertEquals(
+                1L,
+                result.getId()
         );
+
+        assertEquals(
+                10L,
+                result.getBookingId()
+        );
+
+        verify(paymentRepository)
+                .findById(1L);
+
+        verify(bookingRepository)
+                .save(booking);
+
+        verify(paymentRepository)
+                .save(payment);
+
+        verify(notificationService)
+                .createNotification(
+                        5L,
+                        "Payment Failed",
+                        "Your payment for booking EVT-ABC12345 failed. Your booking has been cancelled."
+                );
     }
 
 
@@ -468,13 +619,24 @@ class PaymentServiceTest {
 
         assertThrows(
                 PaymentStateTransitionException.class,
-                () -> paymentService.markPaymentFailed(1L, email)
+                () -> paymentService.markPaymentFailed(
+                        1L,
+                        email
+                )
         );
 
-        verify(paymentRepository, never())
-                .save(any(Payment.class));
+        verify(paymentRepository)
+                .findById(1L);
 
-        verifyNoInteractions(notificationService);
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                bookingRepository,
+                notificationService
+        );
     }
 
 
@@ -508,13 +670,24 @@ class PaymentServiceTest {
 
         assertThrows(
                 BookingNotFoundException.class,
-                () -> paymentService.markPaymentSuccessful(1L, otherEmail)
+                () -> paymentService.markPaymentSuccessful(
+                        1L,
+                        otherEmail
+                )
         );
 
-        verify(paymentRepository, never())
-                .save(any(Payment.class));
+        verify(paymentRepository)
+                .findById(1L);
 
-        verifyNoInteractions(notificationService);
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                bookingRepository,
+                notificationService
+        );
     }
 
 
@@ -544,12 +717,79 @@ class PaymentServiceTest {
 
         assertThrows(
                 BookingNotFoundException.class,
-                () -> paymentService.markPaymentFailed(1L, otherEmail)
+                () -> paymentService.markPaymentFailed(
+                        1L,
+                        otherEmail
+                )
         );
 
-        verify(paymentRepository, never())
-                .save(any(Payment.class));
+        verify(paymentRepository)
+                .findById(1L);
 
-        verifyNoInteractions(notificationService);
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                bookingRepository,
+                notificationService
+        );
+    }
+
+
+    // =========================================================
+    // PAYMENT NOT FOUND DURING STATUS UPDATE
+    // =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenPaymentDoesNotExistDuringSuccess() {
+
+        String email = "user@test.com";
+
+        when(paymentRepository.findById(999L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                PaymentNotFoundException.class,
+                () -> paymentService.markPaymentSuccessful(
+                        999L,
+                        email
+                )
+        );
+
+        verify(paymentRepository)
+                .findById(999L);
+
+        verifyNoInteractions(
+                bookingRepository,
+                notificationService
+        );
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenPaymentDoesNotExistDuringFailure() {
+
+        String email = "user@test.com";
+
+        when(paymentRepository.findById(999L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                PaymentNotFoundException.class,
+                () -> paymentService.markPaymentFailed(
+                        999L,
+                        email
+                )
+        );
+
+        verify(paymentRepository)
+                .findById(999L);
+
+        verifyNoInteractions(
+                bookingRepository,
+                notificationService
+        );
     }
 }
