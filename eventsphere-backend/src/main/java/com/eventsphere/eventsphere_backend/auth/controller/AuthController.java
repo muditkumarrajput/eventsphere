@@ -8,6 +8,7 @@ import com.eventsphere.eventsphere_backend.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -35,6 +36,7 @@ public class AuthController {
             summary = "Register a new user",
             description = "Creates a new EventSphere user account"
     )
+    @SecurityRequirements
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -64,6 +66,7 @@ public class AuthController {
             summary = "Login user",
             description = "Authenticates a user and returns a JWT token"
     )
+    @SecurityRequirements
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
