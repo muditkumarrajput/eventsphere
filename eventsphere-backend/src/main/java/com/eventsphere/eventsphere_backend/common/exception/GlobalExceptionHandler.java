@@ -207,7 +207,7 @@ public class GlobalExceptionHandler {
 
         return buildErrorResponse(
                 HttpStatus.FORBIDDEN,
-                "Access Denied",
+                "You do not have permission to access this resource",
                 request
         );
     }
