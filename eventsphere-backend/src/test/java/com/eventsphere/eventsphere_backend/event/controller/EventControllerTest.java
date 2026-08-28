@@ -51,26 +51,40 @@ class EventControllerTest {
     @BeforeEach
     void setUp() {
 
-        eventService = mock(EventService.class);
+        eventService =
+                mock(EventService.class);
 
-        objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper =
+                new ObjectMapper();
 
-        authentication = mock(Authentication.class);
+        objectMapper.registerModule(
+                new JavaTimeModule()
+        );
+
+        authentication =
+                mock(Authentication.class);
 
         when(authentication.getName())
-                .thenReturn("organizer@test.com");
+                .thenReturn(
+                        "organizer@test.com"
+                );
 
         EventController eventController =
                 new EventController(eventService);
 
-        PageableHandlerMethodArgumentResolver pageableResolver =
+        PageableHandlerMethodArgumentResolver
+                pageableResolver =
                 new PageableHandlerMethodArgumentResolver();
 
-        mockMvc = MockMvcBuilders
-                .standaloneSetup(eventController)
-                .setCustomArgumentResolvers(pageableResolver)
-                .build();
+        mockMvc =
+                MockMvcBuilders
+                        .standaloneSetup(
+                                eventController
+                        )
+                        .setCustomArgumentResolvers(
+                                pageableResolver
+                        )
+                        .build();
     }
 
 
@@ -85,22 +99,38 @@ class EventControllerTest {
                 new CreateEventRequest();
 
         request.setTitle("Java Workshop");
-        request.setDescription("Spring Boot Workshop");
-        request.setLocation("Mumbai");
-        request.setEventDate(
-                LocalDateTime.of(2026, 12, 20, 10, 0)
+        request.setDescription(
+                "Spring Boot Workshop"
         );
+        request.setLocation("Mumbai");
+
+        request.setEventDate(
+                LocalDateTime.of(
+                        2026,
+                        12,
+                        20,
+                        10,
+                        0
+                )
+        );
+
         request.setCapacity(100);
+
         request.setTicketPrice(
                 new BigDecimal("999")
         );
-        request.setCategory(EventCategory.WORKSHOP);
+
+        request.setCategory(
+                EventCategory.WORKSHOP
+        );
 
         EventResponse response =
                 EventResponse.builder()
                         .id(8L)
                         .title("Java Workshop")
-                        .description("Spring Boot Workshop")
+                        .description(
+                                "Spring Boot Workshop"
+                        )
                         .location("Mumbai")
                         .eventDate(
                                 LocalDateTime.of(
@@ -115,18 +145,24 @@ class EventControllerTest {
                         .ticketPrice(
                                 new BigDecimal("999")
                         )
-                        .category(EventCategory.WORKSHOP)
+                        .category(
+                                EventCategory.WORKSHOP
+                        )
                         .build();
 
-        when(eventService.createEvent(
-                any(CreateEventRequest.class),
-                eq("organizer@test.com")
-        )).thenReturn(response);
+        when(
+                eventService.createEvent(
+                        any(CreateEventRequest.class),
+                        eq("organizer@test.com")
+                )
+        ).thenReturn(response);
 
         mockMvc.perform(
                         post("/api/events")
                                 .principal(authentication)
-                                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(
                                         objectMapper.writeValueAsString(
                                                 request
@@ -134,7 +170,10 @@ class EventControllerTest {
                                 )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(8))
+                .andExpect(
+                        jsonPath("$.id")
+                                .value(8)
+                )
                 .andExpect(
                         jsonPath("$.title")
                                 .value("Java Workshop")
@@ -152,10 +191,11 @@ class EventControllerTest {
                                 .value(999)
                 );
 
-        verify(eventService).createEvent(
-                any(CreateEventRequest.class),
-                eq("organizer@test.com")
-        );
+        verify(eventService)
+                .createEvent(
+                        any(CreateEventRequest.class),
+                        eq("organizer@test.com")
+                );
     }
 
 
@@ -179,7 +219,10 @@ class EventControllerTest {
                         get("/api/events")
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
+                .andExpect(
+                        jsonPath("$.size()")
+                                .value(1)
+                )
                 .andExpect(
                         jsonPath("$[0].id")
                                 .value(8)
@@ -189,7 +232,8 @@ class EventControllerTest {
                                 .value("Java Workshop")
                 );
 
-        verify(eventService).getAllEvents();
+        verify(eventService)
+                .getAllEvents();
     }
 
 
@@ -211,10 +255,16 @@ class EventControllerTest {
 
         mockMvc.perform(
                         get("/api/events/search")
-                                .param("keyword", "Java")
+                                .param(
+                                        "keyword",
+                                        "Java"
+                                )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
+                .andExpect(
+                        jsonPath("$.size()")
+                                .value(1)
+                )
                 .andExpect(
                         jsonPath("$[0].title")
                                 .value("Java Workshop")
@@ -230,23 +280,35 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldGetEventsByCategory() throws Exception {
+    void shouldGetEventsByCategory()
+            throws Exception {
 
         EventResponse response =
                 EventResponse.builder()
                         .id(8L)
-                        .category(EventCategory.WORKSHOP)
+                        .category(
+                                EventCategory.WORKSHOP
+                        )
                         .build();
 
-        when(eventService.getEventsByCategory(
-                EventCategory.WORKSHOP
-        )).thenReturn(List.of(response));
+        when(
+                eventService.getEventsByCategory(
+                        EventCategory.WORKSHOP
+                )
+        ).thenReturn(
+                List.of(response)
+        );
 
         mockMvc.perform(
-                        get("/api/events/category/WORKSHOP")
+                        get(
+                                "/api/events/category/WORKSHOP"
+                        )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
+                .andExpect(
+                        jsonPath("$.size()")
+                                .value(1)
+                )
                 .andExpect(
                         jsonPath("$[0].id")
                                 .value(8)
@@ -264,7 +326,8 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldGetEventsByLocation() throws Exception {
+    void shouldGetEventsByLocation()
+            throws Exception {
 
         EventResponse response =
                 EventResponse.builder()
@@ -272,21 +335,33 @@ class EventControllerTest {
                         .location("Mumbai")
                         .build();
 
-        when(eventService.getEventsByLocation("Mumbai"))
-                .thenReturn(List.of(response));
+        when(
+                eventService.getEventsByLocation(
+                        "Mumbai"
+                )
+        ).thenReturn(
+                List.of(response)
+        );
 
         mockMvc.perform(
-                        get("/api/events/location/Mumbai")
+                        get(
+                                "/api/events/location/Mumbai"
+                        )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
+                .andExpect(
+                        jsonPath("$.size()")
+                                .value(1)
+                )
                 .andExpect(
                         jsonPath("$[0].location")
                                 .value("Mumbai")
                 );
 
         verify(eventService)
-                .getEventsByLocation("Mumbai");
+                .getEventsByLocation(
+                        "Mumbai"
+                );
     }
 
 
@@ -295,10 +370,15 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldGetEventsByDate() throws Exception {
+    void shouldGetEventsByDate()
+            throws Exception {
 
         LocalDate date =
-                LocalDate.of(2026, 12, 20);
+                LocalDate.of(
+                        2026,
+                        12,
+                        20
+                );
 
         EventResponse response =
                 EventResponse.builder()
@@ -306,13 +386,20 @@ class EventControllerTest {
                         .build();
 
         when(eventService.getEventsByDate(date))
-                .thenReturn(List.of(response));
+                .thenReturn(
+                        List.of(response)
+                );
 
         mockMvc.perform(
-                        get("/api/events/date/2026-12-20")
+                        get(
+                                "/api/events/date/2026-12-20"
+                        )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
+                .andExpect(
+                        jsonPath("$.size()")
+                                .value(1)
+                )
                 .andExpect(
                         jsonPath("$[0].id")
                                 .value(8)
@@ -328,7 +415,8 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldGetEventsByPriceRange() throws Exception {
+    void shouldGetEventsByPriceRange()
+            throws Exception {
 
         BigDecimal minPrice =
                 new BigDecimal("500");
@@ -344,21 +432,35 @@ class EventControllerTest {
                         )
                         .build();
 
-        when(eventService.getEventsByPriceRange(
-                minPrice,
-                maxPrice
-        )).thenReturn(List.of(response));
+        when(
+                eventService.getEventsByPriceRange(
+                        minPrice,
+                        maxPrice
+                )
+        ).thenReturn(
+                List.of(response)
+        );
 
         mockMvc.perform(
                         get("/api/events/price")
-                                .param("minPrice", "500")
-                                .param("maxPrice", "1500")
+                                .param(
+                                        "minPrice",
+                                        "500"
+                                )
+                                .param(
+                                        "maxPrice",
+                                        "1500"
+                                )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
                 .andExpect(
-                        jsonPath("$[0].ticketPrice")
-                                .value(999)
+                        jsonPath("$.size()")
+                                .value(1)
+                )
+                .andExpect(
+                        jsonPath(
+                                "$[0].ticketPrice"
+                        ).value(999)
                 );
 
         verify(eventService)
@@ -374,25 +476,35 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldGetUpcomingEvents() throws Exception {
+    void shouldGetUpcomingEvents()
+            throws Exception {
 
         EventResponse response =
                 EventResponse.builder()
                         .id(8L)
-                        .title("Upcoming Workshop")
+                        .title(
+                                "Upcoming Workshop"
+                        )
                         .build();
 
         when(eventService.getUpcomingEvents())
-                .thenReturn(List.of(response));
+                .thenReturn(
+                        List.of(response)
+                );
 
         mockMvc.perform(
                         get("/api/events/upcoming")
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
+                .andExpect(
+                        jsonPath("$.size()")
+                                .value(1)
+                )
                 .andExpect(
                         jsonPath("$[0].title")
-                                .value("Upcoming Workshop")
+                                .value(
+                                        "Upcoming Workshop"
+                                )
                 );
 
         verify(eventService)
@@ -405,7 +517,8 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldGetMyEvents() throws Exception {
+    void shouldGetMyEvents()
+            throws Exception {
 
         EventResponse response =
                 EventResponse.builder()
@@ -413,16 +526,27 @@ class EventControllerTest {
                         .title("My Workshop")
                         .build();
 
-        when(eventService.getMyEvents(
-                "organizer@test.com"
-        )).thenReturn(List.of(response));
+        when(
+                eventService.getMyEvents(
+                        "organizer@test.com"
+                )
+        ).thenReturn(
+                List.of(response)
+        );
 
         mockMvc.perform(
-                        get("/api/events/my-events")
-                                .principal(authentication)
+                        get(
+                                "/api/events/my-events"
+                        )
+                                .principal(
+                                        authentication
+                                )
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
+                .andExpect(
+                        jsonPath("$.size()")
+                                .value(1)
+                )
                 .andExpect(
                         jsonPath("$[0].title")
                                 .value("My Workshop")
@@ -440,7 +564,8 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldGetEventsWithPagination() throws Exception {
+    void shouldGetEventsWithPagination()
+            throws Exception {
 
         Pageable pageable =
                 PageRequest.of(0, 5);
@@ -458,9 +583,11 @@ class EventControllerTest {
                         1
                 );
 
-        when(eventService.getEvents(
-                any(Pageable.class)
-        )).thenReturn(page);
+        when(
+                eventService.getEvents(
+                        any(Pageable.class)
+                )
+        ).thenReturn(page);
 
         mockMvc.perform(
                         get("/api/events/page")
@@ -473,16 +600,20 @@ class EventControllerTest {
                                 .value(1)
                 )
                 .andExpect(
-                        jsonPath("$.content[0].id")
-                                .value(8)
+                        jsonPath(
+                                "$.content[0].id"
+                        ).value(8)
                 )
                 .andExpect(
-                        jsonPath("$.content[0].title")
-                                .value("Java Workshop")
+                        jsonPath(
+                                "$.content[0].title"
+                        ).value("Java Workshop")
                 );
 
         verify(eventService)
-                .getEvents(any(Pageable.class));
+                .getEvents(
+                        any(Pageable.class)
+                );
     }
 
 
@@ -491,7 +622,8 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldFilterEvents() throws Exception {
+    void shouldFilterEvents()
+            throws Exception {
 
         Pageable pageable =
                 PageRequest.of(0, 5);
@@ -500,7 +632,9 @@ class EventControllerTest {
                 EventResponse.builder()
                         .id(8L)
                         .title("Java Workshop")
-                        .category(EventCategory.WORKSHOP)
+                        .category(
+                                EventCategory.WORKSHOP
+                        )
                         .location("Mumbai")
                         .ticketPrice(
                                 new BigDecimal("999")
@@ -523,36 +657,57 @@ class EventControllerTest {
                         1
                 );
 
-        when(eventService.filterEvents(
-                eq("Java"),
-                eq(EventCategory.WORKSHOP),
-                eq("Mumbai"),
-                eq(new BigDecimal("500")),
-                eq(new BigDecimal("1500")),
-                eq(LocalDateTime.of(
-                        2026,
-                        12,
-                        1,
-                        0,
-                        0
-                )),
-                eq(LocalDateTime.of(
-                        2026,
-                        12,
-                        31,
-                        23,
-                        59
-                )),
-                any(Pageable.class)
-        )).thenReturn(page);
+        when(
+                eventService.filterEvents(
+                        eq("Java"),
+                        eq(EventCategory.WORKSHOP),
+                        eq("Mumbai"),
+                        eq(new BigDecimal("500")),
+                        eq(new BigDecimal("1500")),
+                        eq(
+                                LocalDateTime.of(
+                                        2026,
+                                        12,
+                                        1,
+                                        0,
+                                        0
+                                )
+                        ),
+                        eq(
+                                LocalDateTime.of(
+                                        2026,
+                                        12,
+                                        31,
+                                        23,
+                                        59
+                                )
+                        ),
+                        any(Pageable.class)
+                )
+        ).thenReturn(page);
 
         mockMvc.perform(
                         get("/api/events/filter")
-                                .param("keyword", "Java")
-                                .param("category", "WORKSHOP")
-                                .param("location", "Mumbai")
-                                .param("minPrice", "500")
-                                .param("maxPrice", "1500")
+                                .param(
+                                        "keyword",
+                                        "Java"
+                                )
+                                .param(
+                                        "category",
+                                        "WORKSHOP"
+                                )
+                                .param(
+                                        "location",
+                                        "Mumbai"
+                                )
+                                .param(
+                                        "minPrice",
+                                        "500"
+                                )
+                                .param(
+                                        "maxPrice",
+                                        "1500"
+                                )
                                 .param(
                                         "startDate",
                                         "2026-12-01T00:00:00"
@@ -561,53 +716,71 @@ class EventControllerTest {
                                         "endDate",
                                         "2026-12-31T23:59:00"
                                 )
-                                .param("page", "0")
-                                .param("size", "5")
+                                .param(
+                                        "page",
+                                        "0"
+                                )
+                                .param(
+                                        "size",
+                                        "5"
+                                )
                 )
                 .andExpect(status().isOk())
                 .andExpect(
-                        jsonPath("$.totalElements")
-                                .value(1)
+                        jsonPath(
+                                "$.totalElements"
+                        ).value(1)
                 )
                 .andExpect(
-                        jsonPath("$.content[0].id")
-                                .value(8)
+                        jsonPath(
+                                "$.content[0].id"
+                        ).value(8)
                 )
                 .andExpect(
-                        jsonPath("$.content[0].title")
-                                .value("Java Workshop")
+                        jsonPath(
+                                "$.content[0].title"
+                        ).value(
+                                "Java Workshop"
+                        )
                 )
                 .andExpect(
-                        jsonPath("$.content[0].location")
-                                .value("Mumbai")
+                        jsonPath(
+                                "$.content[0].location"
+                        ).value("Mumbai")
                 )
                 .andExpect(
-                        jsonPath("$.content[0].ticketPrice")
-                                .value(999)
+                        jsonPath(
+                                "$.content[0].ticketPrice"
+                        ).value(999)
                 );
 
-        verify(eventService).filterEvents(
-                eq("Java"),
-                eq(EventCategory.WORKSHOP),
-                eq("Mumbai"),
-                eq(new BigDecimal("500")),
-                eq(new BigDecimal("1500")),
-                eq(LocalDateTime.of(
-                        2026,
-                        12,
-                        1,
-                        0,
-                        0
-                )),
-                eq(LocalDateTime.of(
-                        2026,
-                        12,
-                        31,
-                        23,
-                        59
-                )),
-                any(Pageable.class)
-        );
+        verify(eventService)
+                .filterEvents(
+                        eq("Java"),
+                        eq(EventCategory.WORKSHOP),
+                        eq("Mumbai"),
+                        eq(new BigDecimal("500")),
+                        eq(new BigDecimal("1500")),
+                        eq(
+                                LocalDateTime.of(
+                                        2026,
+                                        12,
+                                        1,
+                                        0,
+                                        0
+                                )
+                        ),
+                        eq(
+                                LocalDateTime.of(
+                                        2026,
+                                        12,
+                                        31,
+                                        23,
+                                        59
+                                )
+                        ),
+                        any(Pageable.class)
+                );
     }
 
 
@@ -616,7 +789,8 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldFilterEventsWithoutParameters() throws Exception {
+    void shouldFilterEventsWithoutParameters()
+            throws Exception {
 
         Pageable pageable =
                 PageRequest.of(0, 20);
@@ -634,44 +808,52 @@ class EventControllerTest {
                         1
                 );
 
-        when(eventService.filterEvents(
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                any(Pageable.class)
-        )).thenReturn(page);
+        when(
+                eventService.filterEvents(
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        any(Pageable.class)
+                )
+        ).thenReturn(page);
 
         mockMvc.perform(
                         get("/api/events/filter")
                 )
                 .andExpect(status().isOk())
                 .andExpect(
-                        jsonPath("$.totalElements")
-                                .value(1)
+                        jsonPath(
+                                "$.totalElements"
+                        ).value(1)
                 )
                 .andExpect(
-                        jsonPath("$.content[0].id")
-                                .value(8)
+                        jsonPath(
+                                "$.content[0].id"
+                        ).value(8)
                 )
                 .andExpect(
-                        jsonPath("$.content[0].title")
-                                .value("Java Workshop")
+                        jsonPath(
+                                "$.content[0].title"
+                        ).value(
+                                "Java Workshop"
+                        )
                 );
 
-        verify(eventService).filterEvents(
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                any(Pageable.class)
-        );
+        verify(eventService)
+                .filterEvents(
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        eq(null),
+                        any(Pageable.class)
+                );
     }
 
 
@@ -680,7 +862,8 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldGetEventById() throws Exception {
+    void shouldGetEventById()
+            throws Exception {
 
         EventResponse response =
                 EventResponse.builder()
@@ -688,8 +871,9 @@ class EventControllerTest {
                         .title("Java Workshop")
                         .build();
 
-        when(eventService.getEventById(8L))
-                .thenReturn(response);
+        when(
+                eventService.getEventById(8L)
+        ).thenReturn(response);
 
         mockMvc.perform(
                         get("/api/events/8")
@@ -714,14 +898,22 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldUpdateEvent() throws Exception {
+    void shouldUpdateEvent()
+            throws Exception {
 
         UpdateEventRequest request =
                 new UpdateEventRequest();
 
-        request.setTitle("Updated Workshop");
-        request.setDescription("Updated Description");
+        request.setTitle(
+                "Updated Workshop"
+        );
+
+        request.setDescription(
+                "Updated Description"
+        );
+
         request.setLocation("Delhi");
+
         request.setEventDate(
                 LocalDateTime.of(
                         2026,
@@ -731,17 +923,26 @@ class EventControllerTest {
                         0
                 )
         );
+
         request.setCapacity(200);
+
         request.setTicketPrice(
                 new BigDecimal("1499")
         );
-        request.setCategory(EventCategory.WORKSHOP);
+
+        request.setCategory(
+                EventCategory.WORKSHOP
+        );
 
         EventResponse response =
                 EventResponse.builder()
                         .id(8L)
-                        .title("Updated Workshop")
-                        .description("Updated Description")
+                        .title(
+                                "Updated Workshop"
+                        )
+                        .description(
+                                "Updated Description"
+                        )
                         .location("Delhi")
                         .eventDate(
                                 LocalDateTime.of(
@@ -756,19 +957,27 @@ class EventControllerTest {
                         .ticketPrice(
                                 new BigDecimal("1499")
                         )
-                        .category(EventCategory.WORKSHOP)
+                        .category(
+                                EventCategory.WORKSHOP
+                        )
                         .build();
 
-        when(eventService.updateEvent(
-                eq(8L),
-                any(UpdateEventRequest.class),
-                eq("organizer@test.com")
-        )).thenReturn(response);
+        when(
+                eventService.updateEvent(
+                        eq(8L),
+                        any(UpdateEventRequest.class),
+                        eq("organizer@test.com")
+                )
+        ).thenReturn(response);
 
         mockMvc.perform(
                         put("/api/events/8")
-                                .principal(authentication)
-                                .contentType(MediaType.APPLICATION_JSON)
+                                .principal(
+                                        authentication
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content(
                                         objectMapper.writeValueAsString(
                                                 request
@@ -782,18 +991,21 @@ class EventControllerTest {
                 )
                 .andExpect(
                         jsonPath("$.title")
-                                .value("Updated Workshop")
+                                .value(
+                                        "Updated Workshop"
+                                )
                 )
                 .andExpect(
                         jsonPath("$.location")
                                 .value("Delhi")
                 );
 
-        verify(eventService).updateEvent(
-                eq(8L),
-                any(UpdateEventRequest.class),
-                eq("organizer@test.com")
-        );
+        verify(eventService)
+                .updateEvent(
+                        eq(8L),
+                        any(UpdateEventRequest.class),
+                        eq("organizer@test.com")
+                );
     }
 
 
@@ -802,7 +1014,8 @@ class EventControllerTest {
     // =========================================================
 
     @Test
-    void shouldDeleteEvent() throws Exception {
+    void shouldDeleteEvent()
+            throws Exception {
 
         doNothing()
                 .when(eventService)
@@ -813,14 +1026,19 @@ class EventControllerTest {
 
         mockMvc.perform(
                         delete("/api/events/8")
-                                .principal(authentication)
+                                .principal(
+                                        authentication
+                                )
                 )
-                .andExpect(status().isNoContent());
+                .andExpect(
+                        status().isNoContent()
+                );
 
-        verify(eventService).deleteEvent(
-                eq(8L),
-                eq("organizer@test.com")
-        );
+        verify(eventService)
+                .deleteEvent(
+                        eq(8L),
+                        eq("organizer@test.com")
+                );
     }
 
 
@@ -833,9 +1051,13 @@ class EventControllerTest {
             throws Exception {
 
         mockMvc.perform(
-                        get("/api/events/category/INVALID")
+                        get(
+                                "/api/events/category/INVALID"
+                        )
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(
+                        status().isBadRequest()
+                );
     }
 
 
@@ -848,8 +1070,12 @@ class EventControllerTest {
             throws Exception {
 
         mockMvc.perform(
-                        get("/api/events/date/invalid-date")
+                        get(
+                                "/api/events/date/invalid-date"
+                        )
                 )
-                .andExpect(status().isBadRequest());
+                .andExpect(
+                        status().isBadRequest()
+                );
     }
 }

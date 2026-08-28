@@ -35,13 +35,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doThrow;
 
 @ExtendWith(MockitoExtension.class)
 class EventServiceTest {
@@ -72,8 +69,7 @@ class EventServiceTest {
         organizer.setId(3L);
         organizer.setRole(Role.ORGANIZER);
 
-        CreateEventRequest request =
-                new CreateEventRequest();
+        CreateEventRequest request = new CreateEventRequest();
 
         Event event = new Event();
         event.setId(8L);
@@ -101,15 +97,8 @@ class EventServiceTest {
                         email
                 );
 
-        assertEquals(
-                8L,
-                result.getId()
-        );
-
-        assertEquals(
-                organizer,
-                event.getCreatedBy()
-        );
+        assertEquals(8L, result.getId());
+        assertEquals(organizer, event.getCreatedBy());
 
         verify(userRepository)
                 .findByEmail(email);
@@ -189,20 +178,9 @@ class EventServiceTest {
         List<EventResponse> result =
                 eventService.getAllEvents();
 
-        assertEquals(
-                2,
-                result.size()
-        );
-
-        assertEquals(
-                1L,
-                result.get(0).getId()
-        );
-
-        assertEquals(
-                2L,
-                result.get(1).getId()
-        );
+        assertEquals(2, result.size());
+        assertEquals(1L, result.get(0).getId());
+        assertEquals(2L, result.get(1).getId());
 
         verify(eventRepository)
                 .findAll();
@@ -222,8 +200,7 @@ class EventServiceTest {
     @Test
     void shouldGetMyEvents() {
 
-        String email =
-                "organizer@test.com";
+        String email = "organizer@test.com";
 
         User organizer = new User();
         organizer.setId(3L);
@@ -239,14 +216,10 @@ class EventServiceTest {
                         .build();
 
         when(userRepository.findByEmail(email))
-                .thenReturn(
-                        Optional.of(organizer)
-                );
+                .thenReturn(Optional.of(organizer));
 
         when(eventRepository.findByCreatedBy(organizer))
-                .thenReturn(
-                        List.of(event)
-                );
+                .thenReturn(List.of(event));
 
         when(eventMapper.toResponse(event))
                 .thenReturn(response);
@@ -254,15 +227,11 @@ class EventServiceTest {
         List<EventResponse> result =
                 eventService.getMyEvents(email);
 
-        assertEquals(
-                1,
-                result.size()
-        );
+        assertEquals(1, result.size());
+        assertEquals(8L, result.get(0).getId());
 
-        assertEquals(
-                8L,
-                result.get(0).getId()
-        );
+        verify(userRepository)
+                .findByEmail(email);
 
         verify(eventRepository)
                 .findByCreatedBy(organizer);
@@ -275,8 +244,7 @@ class EventServiceTest {
     @Test
     void shouldThrowExceptionWhenUserDoesNotExistForMyEvents() {
 
-        String email =
-                "unknown@test.com";
+        String email = "unknown@test.com";
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.empty());
@@ -309,9 +277,7 @@ class EventServiceTest {
                         .build();
 
         when(eventRepository.findById(eventId))
-                .thenReturn(
-                        Optional.of(event)
-                );
+                .thenReturn(Optional.of(event));
 
         when(eventMapper.toResponse(event))
                 .thenReturn(response);
@@ -319,10 +285,7 @@ class EventServiceTest {
         EventResponse result =
                 eventService.getEventById(eventId);
 
-        assertEquals(
-                eventId,
-                result.getId()
-        );
+        assertEquals(eventId, result.getId());
 
         verify(eventRepository)
                 .findById(eventId);
@@ -360,9 +323,7 @@ class EventServiceTest {
     void shouldAllowOrganizerToUpdateOwnEvent() {
 
         Long eventId = 8L;
-
-        String email =
-                "organizer@test.com";
+        String email = "organizer@test.com";
 
         User organizer = new User();
         organizer.setId(3L);
@@ -406,14 +367,10 @@ class EventServiceTest {
                         .build();
 
         when(eventRepository.findById(eventId))
-                .thenReturn(
-                        Optional.of(event)
-                );
+                .thenReturn(Optional.of(event));
 
         when(userRepository.findByEmail(email))
-                .thenReturn(
-                        Optional.of(organizer)
-                );
+                .thenReturn(Optional.of(organizer));
 
         when(eventRepository.save(event))
                 .thenReturn(event);
@@ -472,9 +429,7 @@ class EventServiceTest {
     void shouldAllowAdminToUpdateAnyEvent() {
 
         Long eventId = 8L;
-
-        String email =
-                "admin@test.com";
+        String email = "admin@test.com";
 
         User owner = new User();
         owner.setId(3L);
@@ -522,14 +477,10 @@ class EventServiceTest {
                         .build();
 
         when(eventRepository.findById(eventId))
-                .thenReturn(
-                        Optional.of(event)
-                );
+                .thenReturn(Optional.of(event));
 
         when(userRepository.findByEmail(email))
-                .thenReturn(
-                        Optional.of(admin)
-                );
+                .thenReturn(Optional.of(admin));
 
         when(eventRepository.save(event))
                 .thenReturn(event);
@@ -575,9 +526,7 @@ class EventServiceTest {
                 new UpdateEventRequest();
 
         when(eventRepository.findById(eventId))
-                .thenReturn(
-                        Optional.of(event)
-                );
+                .thenReturn(Optional.of(event));
 
         when(userRepository.findByEmail(
                 "organizer2@test.com"
@@ -609,9 +558,7 @@ class EventServiceTest {
     void shouldAllowOrganizerToDeleteOwnEvent() {
 
         Long eventId = 8L;
-
-        String email =
-                "organizer@test.com";
+        String email = "organizer@test.com";
 
         User organizer = new User();
         organizer.setId(3L);
@@ -622,14 +569,10 @@ class EventServiceTest {
         event.setCreatedBy(organizer);
 
         when(eventRepository.findById(eventId))
-                .thenReturn(
-                        Optional.of(event)
-                );
+                .thenReturn(Optional.of(event));
 
         when(userRepository.findByEmail(email))
-                .thenReturn(
-                        Optional.of(organizer)
-                );
+                .thenReturn(Optional.of(organizer));
 
         eventService.deleteEvent(
                 eventId,
@@ -645,9 +588,7 @@ class EventServiceTest {
     void shouldAllowAdminToDeleteAnyEvent() {
 
         Long eventId = 8L;
-
-        String email =
-                "admin@test.com";
+        String email = "admin@test.com";
 
         User owner = new User();
         owner.setId(3L);
@@ -662,14 +603,10 @@ class EventServiceTest {
         event.setCreatedBy(owner);
 
         when(eventRepository.findById(eventId))
-                .thenReturn(
-                        Optional.of(event)
-                );
+                .thenReturn(Optional.of(event));
 
         when(userRepository.findByEmail(email))
-                .thenReturn(
-                        Optional.of(admin)
-                );
+                .thenReturn(Optional.of(admin));
 
         eventService.deleteEvent(
                 eventId,
@@ -699,9 +636,7 @@ class EventServiceTest {
         event.setCreatedBy(owner);
 
         when(eventRepository.findById(eventId))
-                .thenReturn(
-                        Optional.of(event)
-                );
+                .thenReturn(Optional.of(event));
 
         when(userRepository.findByEmail(
                 "organizer2@test.com"
@@ -756,10 +691,7 @@ class EventServiceTest {
         List<EventResponse> result =
                 eventService.searchEvents("Java");
 
-        assertEquals(
-                1,
-                result.size()
-        );
+        assertEquals(1, result.size());
 
         assertEquals(
                 "Java Workshop",
@@ -805,10 +737,7 @@ class EventServiceTest {
                         EventCategory.WORKSHOP
                 );
 
-        assertEquals(
-                1,
-                result.size()
-        );
+        assertEquals(1, result.size());
 
         assertEquals(
                 8L,
@@ -849,10 +778,7 @@ class EventServiceTest {
                         "Mumbai"
                 );
 
-        assertEquals(
-                1,
-                result.size()
-        );
+        assertEquals(1, result.size());
 
         assertEquals(
                 8L,
@@ -904,10 +830,7 @@ class EventServiceTest {
         List<EventResponse> result =
                 eventService.getEventsByDate(date);
 
-        assertEquals(
-                1,
-                result.size()
-        );
+        assertEquals(1, result.size());
 
         assertEquals(
                 8L,
@@ -955,10 +878,7 @@ class EventServiceTest {
                         maxPrice
                 );
 
-        assertEquals(
-                1,
-                result.size()
-        );
+        assertEquals(1, result.size());
 
         assertEquals(
                 8L,
@@ -997,10 +917,7 @@ class EventServiceTest {
         List<EventResponse> result =
                 eventService.getUpcomingEvents();
 
-        assertEquals(
-                1,
-                result.size()
-        );
+        assertEquals(1, result.size());
 
         assertEquals(
                 8L,

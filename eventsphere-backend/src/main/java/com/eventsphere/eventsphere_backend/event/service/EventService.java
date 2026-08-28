@@ -10,22 +10,14 @@ import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
 import com.eventsphere.eventsphere_backend.event.mapper.EventMapper;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
+import com.eventsphere.eventsphere_backend.event.specification.EventSpecification;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-
-import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
-import com.eventsphere.eventsphere_backend.event.specification.EventSpecification;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -297,6 +289,10 @@ public class EventService {
             throw new EventOwnershipException();
         }
     }
+
+    // =========================================================
+    // DYNAMIC EVENT FILTERING
+    // =========================================================
 
     public Page<EventResponse> filterEvents(
             String keyword,
