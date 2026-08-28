@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -79,15 +80,17 @@ class UserServiceTest {
         user2.setId(2L);
         user2.setEmail("user2@test.com");
 
-        UserResponse response1 = UserResponse.builder()
-                .id(1L)
-                .email("user1@test.com")
-                .build();
+        UserResponse response1 =
+                UserResponse.builder()
+                        .id(1L)
+                        .email("user1@test.com")
+                        .build();
 
-        UserResponse response2 = UserResponse.builder()
-                .id(2L)
-                .email("user2@test.com")
-                .build();
+        UserResponse response2 =
+                UserResponse.builder()
+                        .id(2L)
+                        .email("user2@test.com")
+                        .build();
 
         when(userRepository.findAll())
                 .thenReturn(List.of(user1, user2));
@@ -124,8 +127,12 @@ class UserServiceTest {
         );
 
         verify(userRepository).findAll();
-        verify(userMapper).toResponse(user1);
-        verify(userMapper).toResponse(user2);
+
+        verify(userMapper)
+                .toResponse(user1);
+
+        verify(userMapper)
+                .toResponse(user2);
     }
 
 
@@ -142,10 +149,11 @@ class UserServiceTest {
         user.setId(5L);
         user.setEmail(email);
 
-        UserResponse response = UserResponse.builder()
-                .id(5L)
-                .email(email)
-                .build();
+        UserResponse response =
+                UserResponse.builder()
+                        .id(5L)
+                        .email(email)
+                        .build();
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
@@ -156,7 +164,10 @@ class UserServiceTest {
         UserResponse result =
                 userService.getCurrentUser(email);
 
-        assertEquals(5L, result.getId());
+        assertEquals(
+                5L,
+                result.getId()
+        );
 
         assertEquals(
                 email,
@@ -210,10 +221,11 @@ class UserServiceTest {
         user.setId(id);
         user.setEmail("user@test.com");
 
-        UserResponse response = UserResponse.builder()
-                .id(id)
-                .email("user@test.com")
-                .build();
+        UserResponse response =
+                UserResponse.builder()
+                        .id(id)
+                        .email("user@test.com")
+                        .build();
 
         when(userRepository.findById(id))
                 .thenReturn(Optional.of(user));
@@ -291,10 +303,11 @@ class UserServiceTest {
         request.setEmail(newEmail);
         request.setPhoneNumber("9999999999");
 
-        UserResponse response = UserResponse.builder()
-                .id(5L)
-                .email(newEmail)
-                .build();
+        UserResponse response =
+                UserResponse.builder()
+                        .id(5L)
+                        .email(newEmail)
+                        .build();
 
         when(userRepository.findByEmail(oldEmail))
                 .thenReturn(Optional.of(user));
@@ -371,10 +384,11 @@ class UserServiceTest {
         request.setEmail(email);
         request.setPhoneNumber("9999999999");
 
-        UserResponse response = UserResponse.builder()
-                .id(5L)
-                .email(email)
-                .build();
+        UserResponse response =
+                UserResponse.builder()
+                        .id(5L)
+                        .email(email)
+                        .build();
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
@@ -411,7 +425,6 @@ class UserServiceTest {
                 result.getEmail()
         );
 
-        // existsByEmail should NOT be called
         verify(
                 userRepository,
                 never()
@@ -532,9 +545,10 @@ class UserServiceTest {
 
         request.setRole(Role.ORGANIZER);
 
-        UserResponse response = UserResponse.builder()
-                .id(id)
-                .build();
+        UserResponse response =
+                UserResponse.builder()
+                        .id(id)
+                        .build();
 
         when(userRepository.findById(id))
                 .thenReturn(Optional.of(user));
@@ -644,13 +658,13 @@ class UserServiceTest {
         User user = new User();
         user.setId(id);
 
+        Event event = mock(Event.class);
+
         when(userRepository.findById(id))
                 .thenReturn(Optional.of(user));
 
         when(eventRepository.findByCreatedBy(user))
-                .thenReturn(
-                        List.of(mock(Event.class))
-                );
+                .thenReturn(List.of(event));
 
         UserHasEventsException exception =
                 assertThrows(
