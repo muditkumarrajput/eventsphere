@@ -17,6 +17,7 @@ import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,20 +73,9 @@ class BookingServiceTest {
                         .numberOfTickets(2)
                         .build();
 
-        Booking savedBooking = Booking.builder()
-                .id(1L)
-                .bookingReference("EVT-ABC12345")
-                .numberOfTickets(2)
-                .totalAmount(new BigDecimal("2998.00"))
-                .bookingStatus(BookingStatus.PENDING)
-                .user(user)
-                .event(event)
-                .build();
-
         BookingResponse response =
                 BookingResponse.builder()
                         .id(1L)
-                        .bookingReference("EVT-ABC12345")
                         .numberOfTickets(2)
                         .totalAmount(new BigDecimal("2998.00"))
                         .bookingStatus(BookingStatus.PENDING)
@@ -93,8 +84,6 @@ class BookingServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        // IMPORTANT:
-        // BookingService now uses findByIdForUpdate()
         when(eventRepository.findByIdForUpdate(3L))
                 .thenReturn(Optional.of(event));
 
@@ -102,9 +91,13 @@ class BookingServiceTest {
                 .thenReturn(10);
 
         when(bookingRepository.save(any(Booking.class)))
-                .thenReturn(savedBooking);
+                .thenAnswer(invocation -> {
+                    Booking booking = invocation.getArgument(0);
+                    booking.setId(1L);
+                    return booking;
+                });
 
-        when(bookingMapper.toResponse(savedBooking))
+        when(bookingMapper.toResponse(any(Booking.class)))
                 .thenReturn(response);
 
         // Act
@@ -117,11 +110,6 @@ class BookingServiceTest {
         assertEquals(
                 1L,
                 result.getId()
-        );
-
-        assertEquals(
-                "EVT-ABC12345",
-                result.getBookingReference()
         );
 
         assertEquals(
@@ -139,6 +127,56 @@ class BookingServiceTest {
                 result.getBookingStatus()
         );
 
+        // Capture the Booking object created by the service
+        ArgumentCaptor<Booking> bookingCaptor =
+                ArgumentCaptor.forClass(Booking.class);
+
+        verify(bookingRepository)
+                .save(bookingCaptor.capture());
+
+        Booking savedBooking =
+                bookingCaptor.getValue();
+
+        // Verify calculated booking data
+        assertEquals(
+                2,
+                savedBooking.getNumberOfTickets()
+        );
+
+        assertEquals(
+                new BigDecimal("2998.00"),
+                savedBooking.getTotalAmount()
+        );
+
+        assertEquals(
+                BookingStatus.PENDING,
+                savedBooking.getBookingStatus()
+        );
+
+        assertEquals(
+                user,
+                savedBooking.getUser()
+        );
+
+        assertEquals(
+                event,
+                savedBooking.getEvent()
+        );
+
+        assertNotNull(
+                savedBooking.getBookingDate()
+        );
+
+        // Verify booking reference format
+        assertNotNull(
+                savedBooking.getBookingReference()
+        );
+
+        assertTrue(
+                savedBooking.getBookingReference()
+                        .matches("EVT-[A-Z0-9]{8}")
+        );
+
         verify(userRepository)
                 .findByEmail(email);
 
@@ -148,11 +186,146 @@ class BookingServiceTest {
         verify(bookingRepository)
                 .getBookedTickets(3L);
 
-        verify(bookingRepository)
-                .save(any(Booking.class));
-
         verify(bookingMapper)
                 .toResponse(savedBooking);
+    }
+
+
+    @Test
+    void shouldCalculateCorrectTotalAmountWhenCreatingBooking() {
+
+        // Arrange
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+
+        Event event = new Event();
+        event.setId(3L);
+        event.setCapacity(100);
+        event.setTicketPrice(new BigDecimal("750.50"));
+
+        CreateBookingRequest request =
+                CreateBookingRequest.builder()
+                        .eventId(3L)
+                        .numberOfTickets(4)
+                        .build();
+
+        BookingResponse response =
+                BookingResponse.builder()
+                        .id(1L)
+                        .totalAmount(new BigDecimal("3002.00"))
+                        .build();
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(eventRepository.findByIdForUpdate(3L))
+                .thenReturn(Optional.of(event));
+
+        when(bookingRepository.getBookedTickets(3L))
+                .thenReturn(20);
+
+        when(bookingRepository.save(any(Booking.class)))
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
+
+        when(bookingMapper.toResponse(any(Booking.class)))
+                .thenReturn(response);
+
+        // Act
+        bookingService.createBooking(request, email);
+
+        // Assert
+        ArgumentCaptor<Booking> bookingCaptor =
+                ArgumentCaptor.forClass(Booking.class);
+
+        verify(bookingRepository)
+                .save(bookingCaptor.capture());
+
+        Booking booking =
+                bookingCaptor.getValue();
+
+        assertEquals(
+                new BigDecimal("3002.00"),
+                booking.getTotalAmount()
+        );
+
+        assertEquals(
+                4,
+                booking.getNumberOfTickets()
+        );
+    }
+
+
+    @Test
+    void shouldGenerateUniqueBookingReference() {
+
+        // Arrange
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+
+        Event event = new Event();
+        event.setId(3L);
+        event.setCapacity(100);
+        event.setTicketPrice(new BigDecimal("1000.00"));
+
+        CreateBookingRequest request =
+                CreateBookingRequest.builder()
+                        .eventId(3L)
+                        .numberOfTickets(1)
+                        .build();
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(eventRepository.findByIdForUpdate(3L))
+                .thenReturn(Optional.of(event));
+
+        when(bookingRepository.getBookedTickets(3L))
+                .thenReturn(0);
+
+        when(bookingRepository.save(any(Booking.class)))
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
+
+        when(bookingMapper.toResponse(any(Booking.class)))
+                .thenReturn(
+                        BookingResponse.builder().build()
+                );
+
+        // Act
+        bookingService.createBooking(request, email);
+
+        // Assert
+        ArgumentCaptor<Booking> bookingCaptor =
+                ArgumentCaptor.forClass(Booking.class);
+
+        verify(bookingRepository)
+                .save(bookingCaptor.capture());
+
+        Booking booking =
+                bookingCaptor.getValue();
+
+        String reference =
+                booking.getBookingReference();
+
+        assertNotNull(reference);
+
+        assertTrue(
+                reference.startsWith("EVT-")
+        );
+
+        assertEquals(
+                12,
+                reference.length()
+        );
+
+        assertTrue(
+                reference.matches("EVT-[A-Z0-9]{8}")
+        );
     }
 
 
@@ -191,6 +364,7 @@ class BookingServiceTest {
 
         verifyNoInteractions(eventRepository);
         verifyNoInteractions(bookingRepository);
+        verifyNoInteractions(bookingMapper);
     }
 
 
@@ -212,8 +386,6 @@ class BookingServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        // IMPORTANT:
-        // BookingService now uses findByIdForUpdate()
         when(eventRepository.findByIdForUpdate(99L))
                 .thenReturn(Optional.empty());
 
@@ -239,6 +411,7 @@ class BookingServiceTest {
                 .findByIdForUpdate(99L);
 
         verifyNoInteractions(bookingRepository);
+        verifyNoInteractions(bookingMapper);
     }
 
 
@@ -265,8 +438,6 @@ class BookingServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        // IMPORTANT:
-        // BookingService now uses findByIdForUpdate()
         when(eventRepository.findByIdForUpdate(3L))
                 .thenReturn(Optional.of(event));
 
@@ -293,6 +464,59 @@ class BookingServiceTest {
                 .save(any(Booking.class));
 
         verifyNoInteractions(bookingMapper);
+    }
+
+
+    @Test
+    void shouldCreateBookingWhenRequestedTicketsExactlyMatchAvailableSeats() {
+
+        // Arrange
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+
+        Event event = new Event();
+        event.setId(3L);
+        event.setCapacity(10);
+        event.setTicketPrice(new BigDecimal("500.00"));
+
+        CreateBookingRequest request =
+                CreateBookingRequest.builder()
+                        .eventId(3L)
+                        .numberOfTickets(2)
+                        .build();
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(eventRepository.findByIdForUpdate(3L))
+                .thenReturn(Optional.of(event));
+
+        // 8 booked -> exactly 2 seats available
+        when(bookingRepository.getBookedTickets(3L))
+                .thenReturn(8);
+
+        when(bookingRepository.save(any(Booking.class)))
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
+
+        when(bookingMapper.toResponse(any(Booking.class)))
+                .thenReturn(
+                        BookingResponse.builder()
+                                .id(1L)
+                                .build()
+                );
+
+        // Act
+        BookingResponse result =
+                bookingService.createBooking(request, email);
+
+        // Assert
+        assertNotNull(result);
+
+        verify(bookingRepository)
+                .save(any(Booking.class));
     }
 
 
@@ -443,6 +667,7 @@ class BookingServiceTest {
                 .findByEmail(email);
 
         verifyNoInteractions(bookingRepository);
+        verifyNoInteractions(bookingMapper);
     }
 
 
@@ -573,6 +798,32 @@ class BookingServiceTest {
         verify(bookingRepository)
                 .findById(99L);
 
+        verifyNoInteractions(bookingMapper);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistWhileGettingBooking() {
+
+        // Arrange
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        // Act + Assert
+        assertThrows(
+                UserNotFoundException.class,
+                () -> bookingService.getBookingById(
+                        1L,
+                        email
+                )
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(bookingRepository);
         verifyNoInteractions(bookingMapper);
     }
 
@@ -742,5 +993,30 @@ class BookingServiceTest {
 
         verify(bookingRepository, never())
                 .save(any(Booking.class));
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringCancellation() {
+
+        // Arrange
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        // Act + Assert
+        assertThrows(
+                UserNotFoundException.class,
+                () -> bookingService.cancelBooking(
+                        1L,
+                        email
+                )
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(bookingRepository);
     }
 }
