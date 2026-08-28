@@ -7,44 +7,30 @@ import com.eventsphere.eventsphere_backend.notification.entity.Notification;
 import com.eventsphere.eventsphere_backend.notification.repository.NotificationRepository;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
+    @Mock
     private NotificationRepository notificationRepository;
+
+    @Mock
     private UserRepository userRepository;
 
+    @InjectMocks
     private NotificationService notificationService;
-
-
-    @BeforeEach
-    void setUp() {
-
-        notificationRepository =
-                mock(NotificationRepository.class);
-
-        userRepository =
-                mock(UserRepository.class);
-
-        notificationService =
-                new NotificationService(
-                        notificationRepository,
-                        userRepository
-                );
-    }
 
 
     // =========================================================
@@ -54,27 +40,23 @@ class NotificationServiceTest {
     @Test
     void shouldCreateNotificationSuccessfully() {
 
-        User user = mock(User.class);
-        Notification notification = mock(Notification.class);
+        User user = new User();
+        user.setId(10L);
+        user.setEmail("user@test.com");
+
+        Notification notification = Notification.builder()
+                .id(5L)
+                .title("Event Reminder")
+                .message("Your event starts tomorrow.")
+                .isRead(false)
+                .user(user)
+                .build();
 
         when(userRepository.findById(10L))
                 .thenReturn(Optional.of(user));
 
-        when(notificationRepository.save(
-                any(Notification.class)
-        )).thenReturn(notification);
-
-        when(notification.getId())
-                .thenReturn(5L);
-
-        when(notification.getTitle())
-                .thenReturn("Event Reminder");
-
-        when(notification.getMessage())
-                .thenReturn("Your event starts tomorrow.");
-
-        when(notification.isRead())
-                .thenReturn(false);
+        when(notificationRepository.save(any(Notification.class)))
+                .thenReturn(notification);
 
         NotificationResponse result =
                 notificationService.createNotification(
@@ -84,17 +66,11 @@ class NotificationServiceTest {
                 );
 
         assertEquals(5L, result.id());
-
-        assertEquals(
-                "Event Reminder",
-                result.title()
-        );
-
+        assertEquals("Event Reminder", result.title());
         assertEquals(
                 "Your event starts tomorrow.",
                 result.message()
         );
-
         assertFalse(result.isRead());
 
         verify(userRepository)
@@ -135,32 +111,30 @@ class NotificationServiceTest {
     @Test
     void shouldGetMyNotificationsSuccessfully() {
 
-        User user = mock(User.class);
-        Notification notification = mock(Notification.class);
+        String email = "user@test.com";
 
-        when(userRepository.findByEmail("user@test.com"))
+        User user = new User();
+        user.setId(10L);
+        user.setEmail(email);
+
+        Notification notification =
+                Notification.builder()
+                        .id(5L)
+                        .title("Event Reminder")
+                        .message("Your event starts tomorrow.")
+                        .isRead(false)
+                        .user(user)
+                        .build();
+
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
         when(notificationRepository
                 .findByUserOrderByCreatedAtDesc(user))
                 .thenReturn(List.of(notification));
 
-        when(notification.getId())
-                .thenReturn(5L);
-
-        when(notification.getTitle())
-                .thenReturn("Event Reminder");
-
-        when(notification.getMessage())
-                .thenReturn("Your event starts tomorrow.");
-
-        when(notification.isRead())
-                .thenReturn(false);
-
         List<NotificationResponse> result =
-                notificationService.getMyNotifications(
-                        "user@test.com"
-                );
+                notificationService.getMyNotifications(email);
 
         assertEquals(1, result.size());
 
@@ -184,7 +158,37 @@ class NotificationServiceTest {
         );
 
         verify(userRepository)
-                .findByEmail("user@test.com");
+                .findByEmail(email);
+
+        verify(notificationRepository)
+                .findByUserOrderByCreatedAtDesc(user);
+    }
+
+
+    @Test
+    void shouldReturnEmptyListWhenUserHasNoNotifications() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(10L);
+        user.setEmail(email);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(notificationRepository
+                .findByUserOrderByCreatedAtDesc(user))
+                .thenReturn(List.of());
+
+        List<NotificationResponse> result =
+                notificationService.getMyNotifications(email);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verify(userRepository)
+                .findByEmail(email);
 
         verify(notificationRepository)
                 .findByUserOrderByCreatedAtDesc(user);
@@ -194,20 +198,20 @@ class NotificationServiceTest {
     @Test
     void shouldThrowExceptionWhenUserNotFoundWhileGettingMyNotifications() {
 
-        when(userRepository.findByEmail("unknown@test.com"))
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 UserNotFoundException.class,
-                () -> notificationService.getMyNotifications(
-                        "unknown@test.com"
-                )
+                () -> notificationService.getMyNotifications(email)
         );
 
-        verify(notificationRepository, never())
-                .findByUserOrderByCreatedAtDesc(
-                        any(User.class)
-                );
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(notificationRepository);
     }
 
 
@@ -218,32 +222,30 @@ class NotificationServiceTest {
     @Test
     void shouldGetUnreadNotificationsSuccessfully() {
 
-        User user = mock(User.class);
-        Notification notification = mock(Notification.class);
+        String email = "user@test.com";
 
-        when(userRepository.findByEmail("user@test.com"))
+        User user = new User();
+        user.setId(10L);
+        user.setEmail(email);
+
+        Notification notification =
+                Notification.builder()
+                        .id(5L)
+                        .title("Payment Successful")
+                        .message("Your payment was successful.")
+                        .isRead(false)
+                        .user(user)
+                        .build();
+
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
         when(notificationRepository
                 .findByUserAndIsReadFalseOrderByCreatedAtDesc(user))
                 .thenReturn(List.of(notification));
 
-        when(notification.getId())
-                .thenReturn(5L);
-
-        when(notification.getTitle())
-                .thenReturn("Payment Successful");
-
-        when(notification.getMessage())
-                .thenReturn("Your payment was successful.");
-
-        when(notification.isRead())
-                .thenReturn(false);
-
         List<NotificationResponse> result =
-                notificationService.getUnreadNotifications(
-                        "user@test.com"
-                );
+                notificationService.getUnreadNotifications(email);
 
         assertEquals(1, result.size());
 
@@ -267,32 +269,60 @@ class NotificationServiceTest {
         );
 
         verify(userRepository)
-                .findByEmail("user@test.com");
+                .findByEmail(email);
 
         verify(notificationRepository)
-                .findByUserAndIsReadFalseOrderByCreatedAtDesc(
-                        user
-                );
+                .findByUserAndIsReadFalseOrderByCreatedAtDesc(user);
+    }
+
+
+    @Test
+    void shouldReturnEmptyListWhenThereAreNoUnreadNotifications() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(10L);
+        user.setEmail(email);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(notificationRepository
+                .findByUserAndIsReadFalseOrderByCreatedAtDesc(user))
+                .thenReturn(List.of());
+
+        List<NotificationResponse> result =
+                notificationService.getUnreadNotifications(email);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(notificationRepository)
+                .findByUserAndIsReadFalseOrderByCreatedAtDesc(user);
     }
 
 
     @Test
     void shouldThrowExceptionWhenUserNotFoundWhileGettingUnreadNotifications() {
 
-        when(userRepository.findByEmail("unknown@test.com"))
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 UserNotFoundException.class,
-                () -> notificationService.getUnreadNotifications(
-                        "unknown@test.com"
-                )
+                () -> notificationService.getUnreadNotifications(email)
         );
 
-        verify(notificationRepository, never())
-                .findByUserAndIsReadFalseOrderByCreatedAtDesc(
-                        any(User.class)
-                );
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(notificationRepository);
     }
 
 
@@ -303,9 +333,13 @@ class NotificationServiceTest {
     @Test
     void shouldGetUnreadCountSuccessfully() {
 
-        User user = mock(User.class);
+        String email = "user@test.com";
 
-        when(userRepository.findByEmail("user@test.com"))
+        User user = new User();
+        user.setId(10L);
+        user.setEmail(email);
+
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
         when(notificationRepository
@@ -313,14 +347,41 @@ class NotificationServiceTest {
                 .thenReturn(3L);
 
         long result =
-                notificationService.getUnreadCount(
-                        "user@test.com"
-                );
+                notificationService.getUnreadCount(email);
 
         assertEquals(3L, result);
 
         verify(userRepository)
-                .findByEmail("user@test.com");
+                .findByEmail(email);
+
+        verify(notificationRepository)
+                .countByUserAndIsReadFalse(user);
+    }
+
+
+    @Test
+    void shouldReturnZeroWhenThereAreNoUnreadNotifications() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(10L);
+        user.setEmail(email);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(notificationRepository
+                .countByUserAndIsReadFalse(user))
+                .thenReturn(0L);
+
+        long result =
+                notificationService.getUnreadCount(email);
+
+        assertEquals(0L, result);
+
+        verify(userRepository)
+                .findByEmail(email);
 
         verify(notificationRepository)
                 .countByUserAndIsReadFalse(user);
@@ -330,20 +391,20 @@ class NotificationServiceTest {
     @Test
     void shouldThrowExceptionWhenUserNotFoundWhileGettingUnreadCount() {
 
-        when(userRepository.findByEmail("unknown@test.com"))
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 UserNotFoundException.class,
-                () -> notificationService.getUnreadCount(
-                        "unknown@test.com"
-                )
+                () -> notificationService.getUnreadCount(email)
         );
 
-        verify(notificationRepository, never())
-                .countByUserAndIsReadFalse(
-                        any(User.class)
-                );
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(notificationRepository);
     }
 
 
@@ -354,28 +415,34 @@ class NotificationServiceTest {
     @Test
     void shouldMarkNotificationAsReadSuccessfully() {
 
+        Long notificationId = 5L;
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(10L);
+        user.setEmail(email);
+
         Notification notification =
-                mock(Notification.class);
+                Notification.builder()
+                        .id(notificationId)
+                        .title("Event Reminder")
+                        .message("Your event starts tomorrow.")
+                        .isRead(false)
+                        .user(user)
+                        .build();
 
-        User user =
-                mock(User.class);
-
-        when(notificationRepository.findById(5L))
+        when(notificationRepository.findById(notificationId))
                 .thenReturn(Optional.of(notification));
 
-        when(notification.getUser())
-                .thenReturn(user);
-
-        when(user.getEmail())
-                .thenReturn("user@test.com");
-
         notificationService.markAsRead(
-                5L,
-                "user@test.com"
+                notificationId,
+                email
         );
 
-        verify(notification)
-                .setRead(true);
+        assertTrue(notification.isRead());
+
+        verify(notificationRepository)
+                .findById(notificationId);
 
         verify(notificationRepository)
                 .save(notification);
@@ -385,19 +452,22 @@ class NotificationServiceTest {
     @Test
     void shouldThrowExceptionWhenNotificationNotFoundWhileMarkingAsRead() {
 
-        when(notificationRepository.findById(5L))
+        Long notificationId = 5L;
+        String email = "user@test.com";
+
+        when(notificationRepository.findById(notificationId))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 NotificationNotFoundException.class,
                 () -> notificationService.markAsRead(
-                        5L,
-                        "user@test.com"
+                        notificationId,
+                        email
                 )
         );
 
         verify(notificationRepository)
-                .findById(5L);
+                .findById(notificationId);
 
         verify(notificationRepository, never())
                 .save(any(Notification.class));
@@ -407,33 +477,78 @@ class NotificationServiceTest {
     @Test
     void shouldThrowExceptionWhenUserDoesNotOwnNotification() {
 
+        Long notificationId = 5L;
+
+        String ownerEmail = "owner@test.com";
+        String otherEmail = "other@test.com";
+
+        User owner = new User();
+        owner.setId(10L);
+        owner.setEmail(ownerEmail);
+
         Notification notification =
-                mock(Notification.class);
+                Notification.builder()
+                        .id(notificationId)
+                        .title("Private Notification")
+                        .message("Private message")
+                        .isRead(false)
+                        .user(owner)
+                        .build();
 
-        User user =
-                mock(User.class);
-
-        when(notificationRepository.findById(5L))
+        when(notificationRepository.findById(notificationId))
                 .thenReturn(Optional.of(notification));
-
-        when(notification.getUser())
-                .thenReturn(user);
-
-        when(user.getEmail())
-                .thenReturn("other@test.com");
 
         assertThrows(
                 NotificationNotFoundException.class,
                 () -> notificationService.markAsRead(
-                        5L,
-                        "user@test.com"
+                        notificationId,
+                        otherEmail
                 )
         );
 
-        verify(notification, never())
-                .setRead(true);
+        assertFalse(notification.isRead());
+
+        verify(notificationRepository)
+                .findById(notificationId);
 
         verify(notificationRepository, never())
                 .save(any(Notification.class));
+    }
+
+
+    @Test
+    void shouldAllowOwnerToMarkAlreadyReadNotificationAsRead() {
+
+        Long notificationId = 5L;
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(10L);
+        user.setEmail(email);
+
+        Notification notification =
+                Notification.builder()
+                        .id(notificationId)
+                        .title("Event Reminder")
+                        .message("Your event starts tomorrow.")
+                        .isRead(true)
+                        .user(user)
+                        .build();
+
+        when(notificationRepository.findById(notificationId))
+                .thenReturn(Optional.of(notification));
+
+        notificationService.markAsRead(
+                notificationId,
+                email
+        );
+
+        assertTrue(notification.isRead());
+
+        verify(notificationRepository)
+                .findById(notificationId);
+
+        verify(notificationRepository)
+                .save(notification);
     }
 }
