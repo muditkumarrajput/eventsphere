@@ -350,6 +350,23 @@ public class GlobalExceptionHandler {
 
 
     // =========================================================
+    // INVALID CREDENTIALS
+    // =========================================================
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCredentialsException(
+            InvalidCredentialsException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.UNAUTHORIZED,
+                ex.getMessage(),
+                request
+        );
+    }
+
+
+    // =========================================================
     // GENERIC EXCEPTION
     // =========================================================
 

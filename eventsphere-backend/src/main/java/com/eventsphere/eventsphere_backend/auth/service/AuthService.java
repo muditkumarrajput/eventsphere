@@ -5,6 +5,7 @@ import com.eventsphere.eventsphere_backend.auth.dto.LoginRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterResponse;
 import com.eventsphere.eventsphere_backend.auth.security.JwtService;
+import com.eventsphere.eventsphere_backend.common.exception.InvalidCredentialsException;
 import com.eventsphere.eventsphere_backend.common.exception.UserEmailAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
@@ -72,19 +73,15 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Invalid email or password"
-                        )
+                .orElseThrow(
+                        InvalidCredentialsException::new
                 );
 
         if (!passwordEncoder.matches(
                 request.getPassword(),
                 user.getPassword())) {
 
-            throw new RuntimeException(
-                    "Invalid email or password"
-            );
+            throw new InvalidCredentialsException();
         }
 
         String token =
