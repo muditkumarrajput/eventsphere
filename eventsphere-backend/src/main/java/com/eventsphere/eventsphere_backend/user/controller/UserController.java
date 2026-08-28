@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -218,7 +219,7 @@ public class UserController {
     )
     @ApiResponses({
             @ApiResponse(
-                    responseCode = "200",
+                    responseCode = "204",
                     description = "User deleted successfully"
             ),
             @ApiResponse(
@@ -238,11 +239,11 @@ public class UserController {
                     description = "User cannot be deleted because of existing events or related data"
             )
     })
-    public String deleteUser(
+    public ResponseEntity<Void> deleteUser(
             @PathVariable Long id) {
 
         userService.deleteUser(id);
 
-        return "User deleted successfully";
+        return ResponseEntity.noContent().build();
     }
 }
