@@ -69,7 +69,8 @@ class EventServiceTest {
         organizer.setId(3L);
         organizer.setRole(Role.ORGANIZER);
 
-        CreateEventRequest request = new CreateEventRequest();
+        CreateEventRequest request =
+                new CreateEventRequest();
 
         Event event = new Event();
         event.setId(8L);
@@ -551,6 +552,85 @@ class EventServiceTest {
 
 
     // =========================================================
+    // UPDATE EVENT - EVENT NOT FOUND
+    // =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenEventDoesNotExistDuringUpdate() {
+
+        Long eventId = 999L;
+        String email = "organizer@test.com";
+
+        UpdateEventRequest request =
+                new UpdateEventRequest();
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                EventNotFoundException.class,
+                () -> eventService.updateEvent(
+                        eventId,
+                        request,
+                        email
+                )
+        );
+
+        verify(eventRepository)
+                .findById(eventId);
+
+        verifyNoInteractions(userRepository);
+        verifyNoInteractions(eventMapper);
+    }
+
+
+    // =========================================================
+    // UPDATE EVENT - USER NOT FOUND
+    // =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringUpdate() {
+
+        Long eventId = 8L;
+        String email = "unknown@test.com";
+
+        Event event = new Event();
+        event.setId(eventId);
+
+        UpdateEventRequest request =
+                new UpdateEventRequest();
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.of(event));
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> eventService.updateEvent(
+                        eventId,
+                        request,
+                        email
+                )
+        );
+
+        verify(eventRepository)
+                .findById(eventId);
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(
+                eventRepository,
+                never()
+        ).save(any(Event.class));
+
+        verifyNoInteractions(eventMapper);
+    }
+
+
+    // =========================================================
     // DELETE EVENT
     // =========================================================
 
@@ -656,6 +736,123 @@ class EventServiceTest {
                 eventRepository,
                 never()
         ).delete(any(Event.class));
+    }
+
+
+    // =========================================================
+    // DELETE EVENT - EVENT NOT FOUND
+    // =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenEventDoesNotExistDuringDelete() {
+
+        Long eventId = 999L;
+        String email = "organizer@test.com";
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                EventNotFoundException.class,
+                () -> eventService.deleteEvent(
+                        eventId,
+                        email
+                )
+        );
+
+        verify(eventRepository)
+                .findById(eventId);
+
+        verifyNoInteractions(userRepository);
+
+        verify(
+                eventRepository,
+                never()
+        ).delete(any(Event.class));
+    }
+
+
+    // =========================================================
+    // DELETE EVENT - USER NOT FOUND
+    // =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringDelete() {
+
+        Long eventId = 8L;
+        String email = "unknown@test.com";
+
+        Event event = new Event();
+        event.setId(eventId);
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.of(event));
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> eventService.deleteEvent(
+                        eventId,
+                        email
+                )
+        );
+
+        verify(eventRepository)
+                .findById(eventId);
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(
+                eventRepository,
+                never()
+        ).delete(any(Event.class));
+    }
+
+
+    // =========================================================
+    // OWNERSHIP VALIDATION - NULL OWNER
+    // =========================================================
+
+    @Test
+    void shouldRejectModificationWhenEventHasNoOwner() {
+
+        Long eventId = 8L;
+        String email = "organizer@test.com";
+
+        User organizer = new User();
+        organizer.setId(3L);
+        organizer.setRole(Role.ORGANIZER);
+
+        Event event = new Event();
+        event.setId(eventId);
+
+        // createdBy intentionally remains null
+
+        UpdateEventRequest request =
+                new UpdateEventRequest();
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.of(event));
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(organizer));
+
+        assertThrows(
+                EventOwnershipException.class,
+                () -> eventService.updateEvent(
+                        eventId,
+                        request,
+                        email
+                )
+        );
+
+        verify(
+                eventRepository,
+                never()
+        ).save(any(Event.class));
     }
 
 

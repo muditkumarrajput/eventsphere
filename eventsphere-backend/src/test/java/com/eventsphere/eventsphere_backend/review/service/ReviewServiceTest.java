@@ -19,12 +19,11 @@ import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,45 +58,46 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldCreateReview() {
+    void shouldCreateReviewSuccessfully() {
 
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
+        user.setId(5L);
+        user.setEmail(email);
 
         Event event = new Event();
-        event.setId(8L);
+        event.setId(3L);
 
         CreateReviewRequest request =
                 CreateReviewRequest.builder()
-                        .eventId(8L)
+                        .eventId(3L)
                         .rating(5)
-                        .comment("Excellent event")
+                        .comment("Excellent workshop!")
                         .build();
 
-        Review review =
+        Review savedReview =
                 Review.builder()
                         .id(10L)
+                        .rating(5)
+                        .comment("Excellent workshop!")
                         .user(user)
                         .event(event)
-                        .rating(5)
-                        .comment("Excellent event")
                         .build();
 
         ReviewResponse response =
                 ReviewResponse.builder()
                         .id(10L)
-                        .eventId(8L)
-                        .userId(1L)
+                        .userId(5L)
+                        .eventId(3L)
                         .rating(5)
-                        .comment("Excellent event")
+                        .comment("Excellent workshop!")
                         .build();
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(8L))
+        when(eventRepository.findById(3L))
                 .thenReturn(Optional.of(event));
 
         when(bookingRepository
@@ -114,9 +114,9 @@ class ReviewServiceTest {
         )).thenReturn(false);
 
         when(reviewRepository.save(any(Review.class)))
-                .thenReturn(review);
+                .thenReturn(savedReview);
 
-        when(reviewMapper.toResponse(review))
+        when(reviewMapper.toResponse(savedReview))
                 .thenReturn(response);
 
         ReviewResponse result =
@@ -125,41 +125,65 @@ class ReviewServiceTest {
                         email
                 );
 
+        assertNotNull(result);
+
         assertEquals(10L, result.getId());
-        assertEquals(8L, result.getEventId());
-        assertEquals(1L, result.getUserId());
+        assertEquals(5L, result.getUserId());
+        assertEquals(3L, result.getEventId());
         assertEquals(5, result.getRating());
         assertEquals(
-                "Excellent event",
+                "Excellent workshop!",
                 result.getComment()
         );
 
-        verify(userRepository).findByEmail(email);
-        verify(eventRepository).findById(8L);
+        ArgumentCaptor<Review> reviewCaptor =
+                ArgumentCaptor.forClass(Review.class);
+
+        verify(reviewRepository)
+                .save(reviewCaptor.capture());
+
+        Review saved =
+                reviewCaptor.getValue();
+
+        assertEquals(5, saved.getRating());
+        assertEquals(
+                "Excellent workshop!",
+                saved.getComment()
+        );
+        assertEquals(user, saved.getUser());
+        assertEquals(event, saved.getEvent());
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(eventRepository)
+                .findById(3L);
+
         verify(bookingRepository)
                 .existsByUserAndEventAndBookingStatus(
                         user,
                         event,
                         BookingStatus.CONFIRMED
                 );
+
         verify(reviewRepository)
                 .existsByUserAndEvent(user, event);
-        verify(reviewRepository)
-                .save(any(Review.class));
-        verify(reviewMapper).toResponse(review);
+
+        verify(reviewMapper)
+                .toResponse(savedReview);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenUserDoesNotExistDuringCreate() {
+    void shouldThrowExceptionWhenUserDoesNotExistDuringCreateReview() {
 
         String email = "unknown@test.com";
 
         CreateReviewRequest request =
                 CreateReviewRequest.builder()
-                        .eventId(8L)
+                        .eventId(3L)
                         .rating(5)
-                        .comment("Good")
+                        .comment("Excellent!")
                         .build();
 
         when(userRepository.findByEmail(email))
@@ -173,31 +197,37 @@ class ReviewServiceTest {
                 )
         );
 
-        verifyNoInteractions(eventRepository);
-        verifyNoInteractions(bookingRepository);
-        verifyNoInteractions(reviewRepository);
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(
+                eventRepository,
+                bookingRepository,
+                reviewRepository,
+                reviewMapper
+        );
     }
 
 
     @Test
-    void shouldThrowExceptionWhenEventDoesNotExistDuringCreate() {
+    void shouldThrowExceptionWhenEventDoesNotExistDuringCreateReview() {
 
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
+        user.setId(5L);
 
         CreateReviewRequest request =
                 CreateReviewRequest.builder()
-                        .eventId(999L)
+                        .eventId(99L)
                         .rating(5)
-                        .comment("Good")
+                        .comment("Excellent!")
                         .build();
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(999L))
+        when(eventRepository.findById(99L))
                 .thenReturn(Optional.empty());
 
         assertThrows(
@@ -208,33 +238,42 @@ class ReviewServiceTest {
                 )
         );
 
-        verifyNoInteractions(bookingRepository);
-        verifyNoInteractions(reviewRepository);
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(eventRepository)
+                .findById(99L);
+
+        verifyNoInteractions(
+                bookingRepository,
+                reviewRepository,
+                reviewMapper
+        );
     }
 
 
     @Test
-    void shouldRejectReviewWhenUserHasNoConfirmedBooking() {
+    void shouldThrowExceptionWhenUserHasNoConfirmedBooking() {
 
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
+        user.setId(5L);
 
         Event event = new Event();
-        event.setId(8L);
+        event.setId(3L);
 
         CreateReviewRequest request =
                 CreateReviewRequest.builder()
-                        .eventId(8L)
-                        .rating(5)
-                        .comment("Good")
+                        .eventId(3L)
+                        .rating(4)
+                        .comment("Good event")
                         .build();
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(8L))
+        when(eventRepository.findById(3L))
                 .thenReturn(Optional.of(event));
 
         when(bookingRepository
@@ -253,36 +292,42 @@ class ReviewServiceTest {
                 )
         );
 
-        verify(reviewRepository, never())
-                .existsByUserAndEvent(any(), any());
+        verify(bookingRepository)
+                .existsByUserAndEventAndBookingStatus(
+                        user,
+                        event,
+                        BookingStatus.CONFIRMED
+                );
 
-        verify(reviewRepository, never())
-                .save(any(Review.class));
+        verifyNoInteractions(
+                reviewRepository,
+                reviewMapper
+        );
     }
 
 
     @Test
-    void shouldRejectDuplicateReview() {
+    void shouldThrowExceptionWhenReviewAlreadyExists() {
 
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
+        user.setId(5L);
 
         Event event = new Event();
-        event.setId(8L);
+        event.setId(3L);
 
         CreateReviewRequest request =
                 CreateReviewRequest.builder()
-                        .eventId(8L)
+                        .eventId(3L)
                         .rating(5)
-                        .comment("Good")
+                        .comment("Excellent!")
                         .build();
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(eventRepository.findById(8L))
+        when(eventRepository.findById(3L))
                 .thenReturn(Optional.of(event));
 
         when(bookingRepository
@@ -306,8 +351,15 @@ class ReviewServiceTest {
                 )
         );
 
-        verify(reviewRepository, never())
-                .save(any(Review.class));
+        verify(reviewRepository)
+                .existsByUserAndEvent(user, event);
+
+        verify(
+                reviewRepository,
+                never()
+        ).save(any(Review.class));
+
+        verifyNoInteractions(reviewMapper);
     }
 
 
@@ -316,47 +368,51 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldGetEventReviews() {
-
-        Long eventId = 8L;
+    void shouldGetEventReviewsSuccessfully() {
 
         Event event = new Event();
-        event.setId(eventId);
+        event.setId(3L);
 
         Review review1 =
                 Review.builder()
-                        .id(10L)
+                        .id(1L)
                         .event(event)
                         .rating(5)
+                        .comment("Excellent!")
                         .build();
 
         Review review2 =
                 Review.builder()
-                        .id(11L)
+                        .id(2L)
                         .event(event)
                         .rating(4)
+                        .comment("Very good!")
                         .build();
 
         ReviewResponse response1 =
                 ReviewResponse.builder()
-                        .id(10L)
-                        .eventId(8L)
+                        .id(1L)
+                        .eventId(3L)
                         .rating(5)
+                        .comment("Excellent!")
                         .build();
 
         ReviewResponse response2 =
                 ReviewResponse.builder()
-                        .id(11L)
-                        .eventId(8L)
+                        .id(2L)
+                        .eventId(3L)
                         .rating(4)
+                        .comment("Very good!")
                         .build();
 
-        when(eventRepository.findById(eventId))
+        when(eventRepository.findById(3L))
                 .thenReturn(Optional.of(event));
 
         when(reviewRepository
                 .findByEventOrderByCreatedAtDesc(event))
-                .thenReturn(List.of(review1, review2));
+                .thenReturn(
+                        List.of(review1, review2)
+                );
 
         when(reviewMapper.toResponse(review1))
                 .thenReturn(response1);
@@ -365,37 +421,74 @@ class ReviewServiceTest {
                 .thenReturn(response2);
 
         List<ReviewResponse> result =
-                reviewService.getEventReviews(eventId);
+                reviewService.getEventReviews(3L);
+
+        assertNotNull(result);
 
         assertEquals(2, result.size());
-        assertEquals(10L, result.get(0).getId());
-        assertEquals(11L, result.get(1).getId());
 
-        verify(eventRepository).findById(eventId);
+        assertEquals(1L, result.get(0).getId());
+        assertEquals(2L, result.get(1).getId());
+
+        verify(eventRepository)
+                .findById(3L);
 
         verify(reviewRepository)
                 .findByEventOrderByCreatedAtDesc(event);
 
-        verify(reviewMapper).toResponse(review1);
-        verify(reviewMapper).toResponse(review2);
+        verify(reviewMapper)
+                .toResponse(review1);
+
+        verify(reviewMapper)
+                .toResponse(review2);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenEventDoesNotExistForReviews() {
+    void shouldReturnEmptyListWhenEventHasNoReviews() {
 
-        Long eventId = 999L;
+        Event event = new Event();
+        event.setId(3L);
 
-        when(eventRepository.findById(eventId))
+        when(eventRepository.findById(3L))
+                .thenReturn(Optional.of(event));
+
+        when(reviewRepository
+                .findByEventOrderByCreatedAtDesc(event))
+                .thenReturn(List.of());
+
+        List<ReviewResponse> result =
+                reviewService.getEventReviews(3L);
+
+        assertNotNull(result);
+
+        assertTrue(result.isEmpty());
+
+        verify(reviewRepository)
+                .findByEventOrderByCreatedAtDesc(event);
+
+        verifyNoInteractions(reviewMapper);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenEventDoesNotExistWhileGettingReviews() {
+
+        when(eventRepository.findById(99L))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 EventNotFoundException.class,
-                () -> reviewService.getEventReviews(eventId)
+                () -> reviewService.getEventReviews(99L)
         );
 
-        verifyNoInteractions(reviewRepository);
-        verifyNoInteractions(reviewMapper);
+        verify(eventRepository)
+                .findById(99L);
+
+        verifyNoInteractions(
+                reviewRepository,
+                reviewMapper
+        );
     }
 
 
@@ -404,27 +497,28 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldGetMyReviews() {
+    void shouldGetMyReviewsSuccessfully() {
 
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
+        user.setId(5L);
+        user.setEmail(email);
 
         Review review =
                 Review.builder()
                         .id(10L)
                         .user(user)
                         .rating(5)
-                        .comment("Excellent")
+                        .comment("Excellent!")
                         .build();
 
         ReviewResponse response =
                 ReviewResponse.builder()
                         .id(10L)
-                        .userId(1L)
+                        .userId(5L)
                         .rating(5)
-                        .comment("Excellent")
+                        .comment("Excellent!")
                         .build();
 
         when(userRepository.findByEmail(email))
@@ -440,21 +534,56 @@ class ReviewServiceTest {
         List<ReviewResponse> result =
                 reviewService.getMyReviews(email);
 
+        assertNotNull(result);
+
         assertEquals(1, result.size());
+
         assertEquals(10L, result.get(0).getId());
         assertEquals(5, result.get(0).getRating());
 
-        verify(userRepository).findByEmail(email);
+        verify(userRepository)
+                .findByEmail(email);
 
         verify(reviewRepository)
                 .findByUserOrderByCreatedAtDesc(user);
 
-        verify(reviewMapper).toResponse(review);
+        verify(reviewMapper)
+                .toResponse(review);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenUserDoesNotExistForMyReviews() {
+    void shouldReturnEmptyListWhenUserHasNoReviews() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+        user.setEmail(email);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(reviewRepository
+                .findByUserOrderByCreatedAtDesc(user))
+                .thenReturn(List.of());
+
+        List<ReviewResponse> result =
+                reviewService.getMyReviews(email);
+
+        assertNotNull(result);
+
+        assertTrue(result.isEmpty());
+
+        verify(reviewRepository)
+                .findByUserOrderByCreatedAtDesc(user);
+
+        verifyNoInteractions(reviewMapper);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistWhileGettingMyReviews() {
 
         String email = "unknown@test.com";
 
@@ -466,79 +595,95 @@ class ReviewServiceTest {
                 () -> reviewService.getMyReviews(email)
         );
 
-        verifyNoInteractions(reviewRepository);
-        verifyNoInteractions(reviewMapper);
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(
+                reviewRepository,
+                reviewMapper
+        );
     }
 
 
     // =========================================================
-    // AVERAGE RATING
+    // GET AVERAGE RATING
     // =========================================================
 
     @Test
-    void shouldGetAverageRating() {
-
-        Long eventId = 8L;
+    void shouldGetAverageRatingSuccessfully() {
 
         Event event = new Event();
-        event.setId(eventId);
+        event.setId(3L);
 
-        when(eventRepository.findById(eventId))
+        when(eventRepository.findById(3L))
                 .thenReturn(Optional.of(event));
 
-        when(reviewRepository.getAverageRating(eventId))
+        when(reviewRepository.getAverageRating(3L))
                 .thenReturn(4.5);
 
         Double result =
-                reviewService.getAverageRating(eventId);
+                reviewService.getAverageRating(3L);
 
-        assertEquals(4.5, result);
+        assertNotNull(result);
 
-        verify(eventRepository).findById(eventId);
+        assertEquals(
+                4.5,
+                result
+        );
+
+        verify(eventRepository)
+                .findById(3L);
+
         verify(reviewRepository)
-                .getAverageRating(eventId);
+                .getAverageRating(3L);
     }
 
 
     @Test
-    void shouldReturnZeroWhenEventHasNoReviews() {
-
-        Long eventId = 8L;
+    void shouldReturnZeroWhenEventHasNoRatings() {
 
         Event event = new Event();
-        event.setId(eventId);
+        event.setId(3L);
 
-        when(eventRepository.findById(eventId))
+        when(eventRepository.findById(3L))
                 .thenReturn(Optional.of(event));
 
-        when(reviewRepository.getAverageRating(eventId))
+        when(reviewRepository.getAverageRating(3L))
                 .thenReturn(null);
 
         Double result =
-                reviewService.getAverageRating(eventId);
+                reviewService.getAverageRating(3L);
 
-        assertEquals(0.0, result);
+        assertNotNull(result);
+
+        assertEquals(
+                0.0,
+                result
+        );
+
+        verify(eventRepository)
+                .findById(3L);
 
         verify(reviewRepository)
-                .getAverageRating(eventId);
+                .getAverageRating(3L);
     }
 
 
     @Test
-    void shouldThrowExceptionWhenEventDoesNotExistForAverageRating() {
+    void shouldThrowExceptionWhenEventDoesNotExistWhileGettingAverageRating() {
 
-        Long eventId = 999L;
-
-        when(eventRepository.findById(eventId))
+        when(eventRepository.findById(99L))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 EventNotFoundException.class,
-                () -> reviewService.getAverageRating(eventId)
+                () -> reviewService.getAverageRating(99L)
         );
 
-        verify(reviewRepository, never())
-                .getAverageRating(anyLong());
+        verify(eventRepository)
+                .findById(99L);
+
+        verifyNoInteractions(reviewRepository);
     }
 
 
@@ -547,44 +692,46 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldUpdateOwnReview() {
+    void shouldUpdateReviewSuccessfully() {
 
-        Long reviewId = 10L;
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
+        user.setId(5L);
+        user.setEmail(email);
 
         Event event = new Event();
-        event.setId(8L);
+        event.setId(3L);
 
         Review review =
                 Review.builder()
-                        .id(reviewId)
+                        .id(10L)
+                        .rating(3)
+                        .comment("Good")
                         .user(user)
                         .event(event)
-                        .rating(3)
-                        .comment("Average")
                         .build();
 
         CreateReviewRequest request =
                 CreateReviewRequest.builder()
-                        .eventId(8L)
+                        .eventId(3L)
                         .rating(5)
-                        .comment("Excellent")
+                        .comment("Excellent!")
                         .build();
 
         ReviewResponse response =
                 ReviewResponse.builder()
-                        .id(reviewId)
+                        .id(10L)
+                        .userId(5L)
+                        .eventId(3L)
                         .rating(5)
-                        .comment("Excellent")
+                        .comment("Excellent!")
                         .build();
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findById(reviewId))
+        when(reviewRepository.findById(10L))
                 .thenReturn(Optional.of(review));
 
         when(reviewRepository.save(review))
@@ -595,107 +742,176 @@ class ReviewServiceTest {
 
         ReviewResponse result =
                 reviewService.updateReview(
-                        reviewId,
+                        10L,
                         request,
                         email
                 );
 
-        assertEquals(5, result.getRating());
-        assertEquals(
-                "Excellent",
-                result.getComment()
-        );
+        assertNotNull(result);
 
         assertEquals(5, review.getRating());
+
         assertEquals(
-                "Excellent",
+                "Excellent!",
                 review.getComment()
         );
 
-        verify(reviewRepository).save(review);
-        verify(reviewMapper).toResponse(review);
+        assertEquals(5, result.getRating());
+
+        assertEquals(
+                "Excellent!",
+                result.getComment()
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(reviewRepository)
+                .findById(10L);
+
+        verify(reviewRepository)
+                .save(review);
+
+        verify(reviewMapper)
+                .toResponse(review);
     }
 
 
     @Test
     void shouldThrowExceptionWhenReviewDoesNotExistDuringUpdate() {
 
-        Long reviewId = 999L;
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
-
-        CreateReviewRequest request =
-                CreateReviewRequest.builder()
-                        .eventId(8L)
-                        .rating(5)
-                        .comment("Good")
-                        .build();
+        user.setId(5L);
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findById(reviewId))
+        when(reviewRepository.findById(99L))
                 .thenReturn(Optional.empty());
+
+        CreateReviewRequest request =
+                CreateReviewRequest.builder()
+                        .eventId(3L)
+                        .rating(5)
+                        .comment("Excellent!")
+                        .build();
 
         assertThrows(
                 ReviewNotFoundException.class,
                 () -> reviewService.updateReview(
-                        reviewId,
+                        99L,
                         request,
                         email
                 )
         );
 
-        verify(reviewRepository, never())
-                .save(any(Review.class));
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(reviewRepository)
+                .findById(99L);
+
+        verify(
+                reviewRepository,
+                never()
+        ).save(any(Review.class));
+
+        verifyNoInteractions(reviewMapper);
     }
 
 
     @Test
-    void shouldRejectUpdatingAnotherUsersReview() {
+    void shouldThrowExceptionWhenAnotherUserUpdatesReview() {
 
-        Long reviewId = 10L;
-        String email = "user2@test.com";
+        String ownerEmail = "owner@test.com";
+        String otherEmail = "other@test.com";
 
         User owner = new User();
-        owner.setId(1L);
+        owner.setId(5L);
+        owner.setEmail(ownerEmail);
 
-        User anotherUser = new User();
-        anotherUser.setId(2L);
+        User otherUser = new User();
+        otherUser.setId(10L);
+        otherUser.setEmail(otherEmail);
 
         Review review =
                 Review.builder()
-                        .id(reviewId)
-                        .user(owner)
+                        .id(10L)
                         .rating(4)
+                        .comment("Good")
+                        .user(owner)
                         .build();
 
         CreateReviewRequest request =
                 CreateReviewRequest.builder()
-                        .eventId(8L)
+                        .eventId(3L)
                         .rating(5)
-                        .comment("Updated")
+                        .comment("Excellent!")
                         .build();
 
-        when(userRepository.findByEmail(email))
-                .thenReturn(Optional.of(anotherUser));
+        when(userRepository.findByEmail(otherEmail))
+                .thenReturn(Optional.of(otherUser));
 
-        when(reviewRepository.findById(reviewId))
+        when(reviewRepository.findById(10L))
                 .thenReturn(Optional.of(review));
 
         assertThrows(
                 ReviewOwnershipException.class,
                 () -> reviewService.updateReview(
-                        reviewId,
+                        10L,
+                        request,
+                        otherEmail
+                )
+        );
+
+        verify(userRepository)
+                .findByEmail(otherEmail);
+
+        verify(reviewRepository)
+                .findById(10L);
+
+        verify(
+                reviewRepository,
+                never()
+        ).save(any(Review.class));
+
+        verifyNoInteractions(reviewMapper);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringUpdate() {
+
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        CreateReviewRequest request =
+                CreateReviewRequest.builder()
+                        .eventId(3L)
+                        .rating(5)
+                        .comment("Excellent!")
+                        .build();
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> reviewService.updateReview(
+                        10L,
                         request,
                         email
                 )
         );
 
-        verify(reviewRepository, never())
-                .save(any(Review.class));
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(
+                reviewRepository,
+                reviewMapper
+        );
     }
 
 
@@ -704,98 +920,151 @@ class ReviewServiceTest {
     // =========================================================
 
     @Test
-    void shouldDeleteOwnReview() {
+    void shouldDeleteReviewSuccessfully() {
 
-        Long reviewId = 10L;
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
+        user.setId(5L);
+        user.setEmail(email);
 
         Review review =
                 Review.builder()
-                        .id(reviewId)
-                        .user(user)
+                        .id(10L)
                         .rating(5)
+                        .comment("Excellent!")
+                        .user(user)
                         .build();
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findById(reviewId))
+        when(reviewRepository.findById(10L))
                 .thenReturn(Optional.of(review));
 
         reviewService.deleteReview(
-                reviewId,
+                10L,
                 email
         );
 
-        verify(reviewRepository).delete(review);
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(reviewRepository)
+                .findById(10L);
+
+        verify(reviewRepository)
+                .delete(review);
     }
 
 
     @Test
     void shouldThrowExceptionWhenReviewDoesNotExistDuringDelete() {
 
-        Long reviewId = 999L;
         String email = "user@test.com";
 
         User user = new User();
-        user.setId(1L);
+        user.setId(5L);
+        user.setEmail(email);
 
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(user));
 
-        when(reviewRepository.findById(reviewId))
+        when(reviewRepository.findById(99L))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 ReviewNotFoundException.class,
                 () -> reviewService.deleteReview(
-                        reviewId,
+                        99L,
                         email
                 )
         );
 
-        verify(reviewRepository, never())
-                .delete(any(Review.class));
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(reviewRepository)
+                .findById(99L);
+
+        verify(
+                reviewRepository,
+                never()
+        ).delete(any(Review.class));
     }
 
 
     @Test
-    void shouldRejectDeletingAnotherUsersReview() {
+    void shouldThrowExceptionWhenAnotherUserDeletesReview() {
 
-        Long reviewId = 10L;
-        String email = "user2@test.com";
+        String ownerEmail = "owner@test.com";
+        String otherEmail = "other@test.com";
 
         User owner = new User();
-        owner.setId(1L);
+        owner.setId(5L);
+        owner.setEmail(ownerEmail);
 
-        User anotherUser = new User();
-        anotherUser.setId(2L);
+        User otherUser = new User();
+        otherUser.setId(10L);
+        otherUser.setEmail(otherEmail);
 
         Review review =
                 Review.builder()
-                        .id(reviewId)
-                        .user(owner)
+                        .id(10L)
                         .rating(5)
+                        .comment("Excellent!")
+                        .user(owner)
                         .build();
 
-        when(userRepository.findByEmail(email))
-                .thenReturn(Optional.of(anotherUser));
+        when(userRepository.findByEmail(otherEmail))
+                .thenReturn(Optional.of(otherUser));
 
-        when(reviewRepository.findById(reviewId))
+        when(reviewRepository.findById(10L))
                 .thenReturn(Optional.of(review));
 
         assertThrows(
                 ReviewOwnershipException.class,
                 () -> reviewService.deleteReview(
-                        reviewId,
+                        10L,
+                        otherEmail
+                )
+        );
+
+        verify(userRepository)
+                .findByEmail(otherEmail);
+
+        verify(reviewRepository)
+                .findById(10L);
+
+        verify(
+                reviewRepository,
+                never()
+        ).delete(any(Review.class));
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringDelete() {
+
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> reviewService.deleteReview(
+                        10L,
                         email
                 )
         );
 
-        verify(reviewRepository, never())
-                .delete(any(Review.class));
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(
+                reviewRepository,
+                reviewMapper
+        );
     }
 }

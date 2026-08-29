@@ -792,4 +792,270 @@ class PaymentServiceTest {
                 notificationService
         );
     }
+    // =========================================================
+    // REFUND PAYMENT
+    // =========================================================
+
+    @Test
+    void shouldRefundPaymentSuccessfully() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+        user.setEmail(email);
+
+        Booking booking = Booking.builder()
+                .id(10L)
+                .bookingReference("EVT-ABC12345")
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .user(user)
+                .build();
+
+        Payment payment = Payment.builder()
+                .id(1L)
+                .paymentReference("PAY-ABC12345")
+                .amount(new BigDecimal("2000.00"))
+                .paymentStatus(PaymentStatus.SUCCESS)
+                .booking(booking)
+                .build();
+
+        CreatePaymentRequest request =
+                new CreatePaymentRequest(10L);
+
+        when(bookingRepository.findById(10L))
+                .thenReturn(Optional.of(booking));
+
+        when(paymentRepository.findByBooking(booking))
+                .thenReturn(Optional.of(payment));
+
+        when(paymentRepository.save(payment))
+                .thenReturn(payment);
+
+        PaymentResponse result =
+                paymentService.refundPayment(
+                        10L,
+                        email
+                );
+
+        assertNotNull(result);
+
+        assertEquals(
+                PaymentStatus.REFUNDED,
+                payment.getPaymentStatus()
+        );
+
+        assertEquals(
+                PaymentStatus.REFUNDED,
+                result.getPaymentStatus()
+        );
+
+        assertEquals(
+                1L,
+                result.getId()
+        );
+
+        assertEquals(
+                10L,
+                result.getBookingId()
+        );
+
+        assertEquals(
+                new BigDecimal("2000.00"),
+                result.getAmount()
+        );
+
+        assertNotNull(
+                payment.getPaymentDate()
+        );
+
+        verify(bookingRepository)
+                .findById(10L);
+
+        verify(paymentRepository)
+                .findByBooking(booking);
+
+        verify(paymentRepository)
+                .save(payment);
+
+        verify(notificationService)
+                .createNotification(
+                        5L,
+                        "Payment Refunded",
+                        "Your payment for booking EVT-ABC12345 has been refunded."
+                );
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenBookingDoesNotExistDuringRefund() {
+
+        String email = "user@test.com";
+
+        when(bookingRepository.findById(999L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                BookingNotFoundException.class,
+                () -> paymentService.refundPayment(
+                        999L,
+                        email
+                )
+        );
+
+        verify(bookingRepository)
+                .findById(999L);
+
+        verifyNoInteractions(
+                paymentRepository,
+                notificationService
+        );
+    }
+
+
+    @Test
+    void shouldNotAllowAnotherUserToRefundPayment() {
+
+        String ownerEmail = "owner@test.com";
+        String otherEmail = "other@test.com";
+
+        User owner = new User();
+        owner.setId(5L);
+        owner.setEmail(ownerEmail);
+
+        Booking booking = Booking.builder()
+                .id(10L)
+                .bookingReference("EVT-ABC12345")
+                .user(owner)
+                .build();
+
+        when(bookingRepository.findById(10L))
+                .thenReturn(Optional.of(booking));
+
+        assertThrows(
+                BookingNotFoundException.class,
+                () -> paymentService.refundPayment(
+                        10L,
+                        otherEmail
+                )
+        );
+
+        verify(bookingRepository)
+                .findById(10L);
+
+        verify(
+                paymentRepository,
+                never()
+        ).findByBooking(booking);
+
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                notificationService
+        );
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenPaymentDoesNotExistDuringRefund() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+        user.setEmail(email);
+
+        Booking booking = Booking.builder()
+                .id(10L)
+                .bookingReference("EVT-ABC12345")
+                .user(user)
+                .build();
+
+        when(bookingRepository.findById(10L))
+                .thenReturn(Optional.of(booking));
+
+        when(paymentRepository.findByBooking(booking))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                PaymentNotFoundException.class,
+                () -> paymentService.refundPayment(
+                        10L,
+                        email
+                )
+        );
+
+        verify(bookingRepository)
+                .findById(10L);
+
+        verify(paymentRepository)
+                .findByBooking(booking);
+
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                notificationService
+        );
+    }
+
+
+    @Test
+    void shouldNotRefundPaymentWhenPaymentIsNotSuccessful() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+        user.setEmail(email);
+
+        Booking booking = Booking.builder()
+                .id(10L)
+                .bookingReference("EVT-ABC12345")
+                .bookingStatus(BookingStatus.PENDING)
+                .user(user)
+                .build();
+
+        Payment payment = Payment.builder()
+                .id(1L)
+                .paymentReference("PAY-ABC12345")
+                .amount(new BigDecimal("2000.00"))
+                .paymentStatus(PaymentStatus.PENDING)
+                .booking(booking)
+                .build();
+
+        when(bookingRepository.findById(10L))
+                .thenReturn(Optional.of(booking));
+
+        when(paymentRepository.findByBooking(booking))
+                .thenReturn(Optional.of(payment));
+
+        assertThrows(
+                PaymentStateTransitionException.class,
+                () -> paymentService.refundPayment(
+                        10L,
+                        email
+                )
+        );
+
+        verify(bookingRepository)
+                .findById(10L);
+
+        verify(paymentRepository)
+                .findByBooking(booking);
+
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                notificationService
+        );
+    }
 }

@@ -263,4 +263,206 @@ class FavoriteServiceTest {
         // Assert
         assertFalse(result);
     }
+    // =========================================================
+// ADD FAVORITE - USER NOT FOUND
+// =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringAddFavorite() {
+
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> favoriteService.addFavorite(3L, email)
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(
+                eventRepository,
+                favoriteRepository
+        );
+    }
+
+
+// =========================================================
+// ADD FAVORITE - EVENT NOT FOUND
+// =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenEventDoesNotExistDuringAddFavorite() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(eventRepository.findById(999L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                EventNotFoundException.class,
+                () -> favoriteService.addFavorite(999L, email)
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(eventRepository)
+                .findById(999L);
+
+        verifyNoInteractions(favoriteRepository);
+    }
+
+
+// =========================================================
+// REMOVE FAVORITE - USER NOT FOUND
+// =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringRemoveFavorite() {
+
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> favoriteService.removeFavorite(3L, email)
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(
+                eventRepository,
+                favoriteRepository
+        );
+    }
+
+
+// =========================================================
+// REMOVE FAVORITE - EVENT NOT FOUND
+// =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenEventDoesNotExistDuringRemoveFavorite() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(eventRepository.findById(999L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                EventNotFoundException.class,
+                () -> favoriteService.removeFavorite(999L, email)
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(eventRepository)
+                .findById(999L);
+
+        verifyNoInteractions(favoriteRepository);
+    }
+
+
+// =========================================================
+// GET MY FAVORITES - USER NOT FOUND
+// =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringGetMyFavorites() {
+
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> favoriteService.getMyFavorites(email)
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(favoriteRepository);
+    }
+
+
+// =========================================================
+// CHECK FAVORITE - USER NOT FOUND
+// =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenUserDoesNotExistDuringIsFavorite() {
+
+        String email = "unknown@test.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> favoriteService.isFavorite(3L, email)
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verifyNoInteractions(
+                eventRepository,
+                favoriteRepository
+        );
+    }
+
+
+// =========================================================
+// CHECK FAVORITE - EVENT NOT FOUND
+// =========================================================
+
+    @Test
+    void shouldThrowExceptionWhenEventDoesNotExistDuringIsFavorite() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(eventRepository.findById(999L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                EventNotFoundException.class,
+                () -> favoriteService.isFavorite(999L, email)
+        );
+
+        verify(userRepository)
+                .findByEmail(email);
+
+        verify(eventRepository)
+                .findById(999L);
+
+        verifyNoInteractions(favoriteRepository);
+    }
 }

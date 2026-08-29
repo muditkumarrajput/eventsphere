@@ -13,6 +13,7 @@ import com.eventsphere.eventsphere_backend.common.exception.EventNotFoundExcepti
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
+import com.eventsphere.eventsphere_backend.payment.service.PaymentService;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -31,17 +32,20 @@ public class BookingService {
     private final UserRepository userRepository;
     private final EventRepository eventRepository;
     private final BookingMapper bookingMapper;
+    private final PaymentService paymentService;
 
     public BookingService(
             BookingRepository bookingRepository,
             UserRepository userRepository,
             EventRepository eventRepository,
-            BookingMapper bookingMapper) {
+            BookingMapper bookingMapper,
+            PaymentService paymentService) {
 
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.eventRepository = eventRepository;
         this.bookingMapper = bookingMapper;
+        this.paymentService = paymentService;
     }
 
     // =========================================================
@@ -100,7 +104,7 @@ public class BookingService {
                 )
                 .totalAmount(totalAmount)
 
-                // Payment must succeed before confirmation
+                // Booking remains pending until payment succeeds
                 .bookingStatus(BookingStatus.PENDING)
 
                 .bookingDate(LocalDateTime.now())
@@ -203,6 +207,19 @@ public class BookingService {
                 == BookingStatus.CANCELLED) {
 
             throw new BookingAlreadyCancelledException(id);
+        }
+
+        /*
+         * If payment was successful,
+         * refund the payment before cancelling the booking.
+         */
+        if (booking.getBookingStatus()
+                == BookingStatus.CONFIRMED) {
+
+            paymentService.refundPayment(
+                    booking.getId(),
+                    email
+            );
         }
 
         // Cancel booking
