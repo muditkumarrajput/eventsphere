@@ -28,7 +28,10 @@ public class JwtService {
         this.jwtExpiration = jwtExpiration;
     }
 
-    // Generate JWT Token
+    // =========================================================
+    // GENERATE JWT TOKEN
+    // =========================================================
+
     public String generateToken(String email) {
 
         return Jwts.builder()
@@ -44,7 +47,10 @@ public class JwtService {
                 .compact();
     }
 
-    // Extract Email
+    // =========================================================
+    // EXTRACT EMAIL
+    // =========================================================
+
     public String extractEmail(String token) {
 
         return extractClaim(
@@ -53,7 +59,10 @@ public class JwtService {
         );
     }
 
-    // Extract Any Claim
+    // =========================================================
+    // EXTRACT ANY CLAIM
+    // =========================================================
+
     public <T> T extractClaim(
             String token,
             Function<Claims, T> claimsResolver) {
@@ -63,7 +72,10 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
-    // Read All Claims
+    // =========================================================
+    // READ ALL CLAIMS
+    // =========================================================
+
     private Claims extractAllClaims(String token) {
 
         return Jwts.parser()
@@ -73,18 +85,31 @@ public class JwtService {
                 .getPayload();
     }
 
-    // Validate Token
+    // =========================================================
+    // VALIDATE TOKEN
+    // =========================================================
+
     public boolean isTokenValid(
             String token,
             String email) {
 
-        String extractedEmail = extractEmail(token);
+        try {
 
-        return extractedEmail.equals(email)
-                && !isTokenExpired(token);
+            String extractedEmail = extractEmail(token);
+
+            return extractedEmail.equals(email)
+                    && !isTokenExpired(token);
+
+        } catch (Exception ex) {
+
+            return false;
+        }
     }
 
-    // Check Expiry
+    // =========================================================
+    // CHECK TOKEN EXPIRY
+    // =========================================================
+
     private boolean isTokenExpired(String token) {
 
         return extractClaim(
