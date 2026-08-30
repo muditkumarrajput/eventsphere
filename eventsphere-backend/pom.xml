@@ -39,6 +39,24 @@
 
 
 	<!-- =========================================================
+         TESTCONTAINERS VERSION MANAGEMENT
+         ========================================================= -->
+	<dependencyManagement>
+		<dependencies>
+
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>1.21.3</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+
+		</dependencies>
+	</dependencyManagement>
+
+
+	<!-- =========================================================
          DEPENDENCIES
          ========================================================= -->
 	<dependencies>
@@ -121,6 +139,25 @@
 
 
 		<!-- =====================================================
+             TESTCONTAINERS
+             ===================================================== -->
+
+		<!-- JUnit 5 integration -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- PostgreSQL container -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+
+		<!-- =====================================================
              SPRING SECURITY TESTING
              ===================================================== -->
 		<dependency>
@@ -183,9 +220,6 @@
 	</dependencies>
 
 
-	<!-- =========================================================
-         BUILD
-         ========================================================= -->
 	<!-- =========================================================
          BUILD
          ========================================================= -->
