@@ -11,7 +11,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        indexes = {
+                @Index(
+                        name = "idx_users_role",
+                        columnList = "role"
+                )
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -35,11 +43,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    @OneToMany(
-            mappedBy = "user",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
+    @OneToMany(mappedBy = "user")
     @Builder.Default
     private List<Booking> bookings = new ArrayList<>();
 

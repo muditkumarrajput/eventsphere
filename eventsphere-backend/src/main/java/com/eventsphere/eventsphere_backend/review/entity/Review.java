@@ -17,6 +17,16 @@ import java.time.LocalDateTime;
                         name = "uk_review_user_event",
                         columnNames = {"user_id", "event_id"}
                 )
+        },
+        indexes = {
+                @Index(
+                        name = "idx_reviews_event_created_at",
+                        columnList = "event_id, created_at"
+                ),
+                @Index(
+                        name = "idx_reviews_user_created_at",
+                        columnList = "user_id, created_at"
+                )
         }
 )
 @Getter

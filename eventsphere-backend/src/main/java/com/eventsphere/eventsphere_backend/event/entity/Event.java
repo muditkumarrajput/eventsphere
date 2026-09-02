@@ -13,7 +13,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "events")
+@Table(
+        name = "events",
+        indexes = {
+                @Index(
+                        name = "idx_events_created_by",
+                        columnList = "created_by"
+                ),
+                @Index(
+                        name = "idx_events_category",
+                        columnList = "category"
+                ),
+                @Index(
+                        name = "idx_events_event_date",
+                        columnList = "event_date"
+                ),
+                @Index(
+                        name = "idx_events_ticket_price",
+                        columnList = "ticket_price"
+                )
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -51,11 +71,7 @@ public class Event {
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 
-    @OneToMany(
-            mappedBy = "event",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
+    @OneToMany(mappedBy = "event")
     @Builder.Default
     private List<Booking> bookings = new ArrayList<>();
 

@@ -12,7 +12,19 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "bookings")
+@Table(
+        name = "bookings",
+        indexes = {
+                @Index(
+                        name = "idx_bookings_user_created_at",
+                        columnList = "user_id, created_at"
+                ),
+                @Index(
+                        name = "idx_bookings_event_status",
+                        columnList = "event_id, booking_status"
+                )
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -51,11 +63,7 @@ public class Booking {
     private Event event;
 
     // One booking can have one payment
-    @OneToOne(
-            mappedBy = "booking",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
+    @OneToOne(mappedBy = "booking")
     private Payment payment;
 
     @CreationTimestamp
