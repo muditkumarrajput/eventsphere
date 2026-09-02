@@ -1,5 +1,7 @@
 package com.eventsphere.eventsphere_backend.event.service;
 
+import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
+import com.eventsphere.eventsphere_backend.common.exception.EventHasBookingsException;
 import com.eventsphere.eventsphere_backend.common.exception.EventNotFoundException;
 import com.eventsphere.eventsphere_backend.common.exception.EventOwnershipException;
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
@@ -48,6 +50,9 @@ class EventServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private BookingRepository bookingRepository;
 
     @Mock
     private EventMapper eventMapper;
@@ -551,10 +556,6 @@ class EventServiceTest {
     }
 
 
-    // =========================================================
-    // UPDATE EVENT - EVENT NOT FOUND
-    // =========================================================
-
     @Test
     void shouldThrowExceptionWhenEventDoesNotExistDuringUpdate() {
 
@@ -583,10 +584,6 @@ class EventServiceTest {
         verifyNoInteractions(eventMapper);
     }
 
-
-    // =========================================================
-    // UPDATE EVENT - USER NOT FOUND
-    // =========================================================
 
     @Test
     void shouldThrowExceptionWhenUserDoesNotExistDuringUpdate() {
@@ -635,7 +632,7 @@ class EventServiceTest {
     // =========================================================
 
     @Test
-    void shouldAllowOrganizerToDeleteOwnEvent() {
+    void shouldAllowOrganizerToDeleteOwnEventWithoutBookings() {
 
         Long eventId = 8L;
         String email = "organizer@test.com";
@@ -654,10 +651,16 @@ class EventServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(organizer));
 
+        when(bookingRepository.existsByEvent(event))
+                .thenReturn(false);
+
         eventService.deleteEvent(
                 eventId,
                 email
         );
+
+        verify(bookingRepository)
+                .existsByEvent(event);
 
         verify(eventRepository)
                 .delete(event);
@@ -665,7 +668,7 @@ class EventServiceTest {
 
 
     @Test
-    void shouldAllowAdminToDeleteAnyEvent() {
+    void shouldAllowAdminToDeleteAnyEventWithoutBookings() {
 
         Long eventId = 8L;
         String email = "admin@test.com";
@@ -688,10 +691,16 @@ class EventServiceTest {
         when(userRepository.findByEmail(email))
                 .thenReturn(Optional.of(admin));
 
+        when(bookingRepository.existsByEvent(event))
+                .thenReturn(false);
+
         eventService.deleteEvent(
                 eventId,
                 email
         );
+
+        verify(bookingRepository)
+                .existsByEvent(event);
 
         verify(eventRepository)
                 .delete(event);
@@ -736,12 +745,99 @@ class EventServiceTest {
                 eventRepository,
                 never()
         ).delete(any(Event.class));
+
+        verify(
+                bookingRepository,
+                never()
+        ).existsByEvent(any(Event.class));
     }
 
 
-    // =========================================================
-    // DELETE EVENT - EVENT NOT FOUND
-    // =========================================================
+    @Test
+    void shouldRejectDeletingEventWhenBookingsExist() {
+
+        Long eventId = 8L;
+        String email = "organizer@test.com";
+
+        User organizer = new User();
+        organizer.setId(3L);
+        organizer.setRole(Role.ORGANIZER);
+
+        Event event = new Event();
+        event.setId(eventId);
+        event.setCreatedBy(organizer);
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.of(event));
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(organizer));
+
+        when(bookingRepository.existsByEvent(event))
+                .thenReturn(true);
+
+        assertThrows(
+                EventHasBookingsException.class,
+                () -> eventService.deleteEvent(
+                        eventId,
+                        email
+                )
+        );
+
+        verify(bookingRepository)
+                .existsByEvent(event);
+
+        verify(
+                eventRepository,
+                never()
+        ).delete(any(Event.class));
+    }
+
+
+    @Test
+    void shouldRejectAdminDeletingEventWhenBookingsExist() {
+
+        Long eventId = 8L;
+        String email = "admin@test.com";
+
+        User owner = new User();
+        owner.setId(3L);
+        owner.setRole(Role.ORGANIZER);
+
+        User admin = new User();
+        admin.setId(2L);
+        admin.setRole(Role.ADMIN);
+
+        Event event = new Event();
+        event.setId(eventId);
+        event.setCreatedBy(owner);
+
+        when(eventRepository.findById(eventId))
+                .thenReturn(Optional.of(event));
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(admin));
+
+        when(bookingRepository.existsByEvent(event))
+                .thenReturn(true);
+
+        assertThrows(
+                EventHasBookingsException.class,
+                () -> eventService.deleteEvent(
+                        eventId,
+                        email
+                )
+        );
+
+        verify(bookingRepository)
+                .existsByEvent(event);
+
+        verify(
+                eventRepository,
+                never()
+        ).delete(any(Event.class));
+    }
+
 
     @Test
     void shouldThrowExceptionWhenEventDoesNotExistDuringDelete() {
@@ -766,15 +862,16 @@ class EventServiceTest {
         verifyNoInteractions(userRepository);
 
         verify(
+                bookingRepository,
+                never()
+        ).existsByEvent(any(Event.class));
+
+        verify(
                 eventRepository,
                 never()
         ).delete(any(Event.class));
     }
 
-
-    // =========================================================
-    // DELETE EVENT - USER NOT FOUND
-    // =========================================================
 
     @Test
     void shouldThrowExceptionWhenUserDoesNotExistDuringDelete() {
@@ -806,6 +903,11 @@ class EventServiceTest {
                 .findByEmail(email);
 
         verify(
+                bookingRepository,
+                never()
+        ).existsByEvent(any(Event.class));
+
+        verify(
                 eventRepository,
                 never()
         ).delete(any(Event.class));
@@ -828,8 +930,6 @@ class EventServiceTest {
 
         Event event = new Event();
         event.setId(eventId);
-
-        // createdBy intentionally remains null
 
         UpdateEventRequest request =
                 new UpdateEventRequest();

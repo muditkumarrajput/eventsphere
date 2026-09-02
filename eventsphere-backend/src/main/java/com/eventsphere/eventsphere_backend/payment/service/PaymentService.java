@@ -45,41 +45,37 @@ public class PaymentService {
             CreatePaymentRequest request,
             String email) {
 
-        Booking booking = bookingRepository.findById(
-                        request.bookingId()
-                )
+        Booking booking = bookingRepository.findById(request.bookingId())
                 .orElseThrow(() ->
-                        new BookingNotFoundException(
-                                request.bookingId()
-                        ));
+                        new BookingNotFoundException(request.bookingId()));
 
-        // Only booking owner can create payment
-        verifyBookingOwnership(
-                booking,
-                email
-        );
+        verifyBookingOwnership(booking, email);
 
-        // Prevent duplicate payment for the same booking
-        if (paymentRepository.existsByBooking(booking)) {
-
-            throw new PaymentAlreadyExistsException(
-                    request.bookingId()
+        /*
+         * A payment can only be created while the booking
+         * is still pending.
+         *
+         * CANCELLED and CONFIRMED bookings must not create
+         * another payment.
+         */
+        if (booking.getBookingStatus() != BookingStatus.PENDING) {
+            throw new PaymentStateTransitionException(
+                    booking.getId(),
+                    booking.getBookingStatus().name(),
+                    BookingStatus.PENDING.name()
             );
         }
 
+        if (paymentRepository.existsByBooking(booking)) {
+            throw new PaymentAlreadyExistsException(
+                    request.bookingId());
+        }
+
         Payment payment = Payment.builder()
-                .paymentReference(
-                        generatePaymentReference()
-                )
-                .amount(
-                        booking.getTotalAmount()
-                )
-                .paymentStatus(
-                        PaymentStatus.PENDING
-                )
-                .paymentDate(
-                        LocalDateTime.now()
-                )
+                .paymentReference(generatePaymentReference())
+                .amount(booking.getTotalAmount())
+                .paymentStatus(PaymentStatus.PENDING)
+                .paymentDate(LocalDateTime.now())
                 .booking(booking)
                 .build();
 
@@ -90,7 +86,7 @@ public class PaymentService {
     }
 
     // =========================================================
-    // GET PAYMENT BY ID
+    // GET PAYMENT
     // =========================================================
 
     public PaymentResponse getPaymentById(
@@ -101,7 +97,6 @@ public class PaymentService {
                 .orElseThrow(() ->
                         new PaymentNotFoundException(id));
 
-        // Only booking owner can view payment
         verifyBookingOwnership(
                 payment.getBooking(),
                 email
@@ -111,7 +106,7 @@ public class PaymentService {
     }
 
     // =========================================================
-    // MARK PAYMENT AS SUCCESSFUL
+    // MARK PAYMENT SUCCESSFUL
     // =========================================================
 
     @Transactional
@@ -125,15 +120,19 @@ public class PaymentService {
 
         Booking booking = payment.getBooking();
 
-        // Only booking owner can update payment
         verifyBookingOwnership(
                 booking,
                 email
         );
 
-        // Only PENDING payment can become SUCCESS
-        if (payment.getPaymentStatus()
-                != PaymentStatus.PENDING) {
+        /*
+         * Both payment and booking must be PENDING.
+         *
+         * This prevents a cancelled booking from becoming
+         * confirmed through a late payment-success request.
+         */
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING
+                || booking.getBookingStatus() != BookingStatus.PENDING) {
 
             throw new PaymentStateTransitionException(
                     id,
@@ -142,12 +141,10 @@ public class PaymentService {
             );
         }
 
-        // Update payment status
         payment.setPaymentStatus(
                 PaymentStatus.SUCCESS
         );
 
-        // Confirm booking
         booking.setBookingStatus(
                 BookingStatus.CONFIRMED
         );
@@ -157,7 +154,6 @@ public class PaymentService {
         Payment savedPayment =
                 paymentRepository.save(payment);
 
-        // Create notification
         notificationService.createNotification(
                 booking.getUser().getId(),
                 "Payment Successful",
@@ -170,7 +166,7 @@ public class PaymentService {
     }
 
     // =========================================================
-    // MARK PAYMENT AS FAILED
+    // MARK PAYMENT FAILED
     // =========================================================
 
     @Transactional
@@ -184,15 +180,19 @@ public class PaymentService {
 
         Booking booking = payment.getBooking();
 
-        // Only booking owner can update payment
         verifyBookingOwnership(
                 booking,
                 email
         );
 
-        // Only PENDING payment can become FAILED
-        if (payment.getPaymentStatus()
-                != PaymentStatus.PENDING) {
+        /*
+         * Both payment and booking must be PENDING.
+         *
+         * This prevents a payment from being marked FAILED
+         * after the booking has already been cancelled.
+         */
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING
+                || booking.getBookingStatus() != BookingStatus.PENDING) {
 
             throw new PaymentStateTransitionException(
                     id,
@@ -201,12 +201,10 @@ public class PaymentService {
             );
         }
 
-        // Update payment status
         payment.setPaymentStatus(
                 PaymentStatus.FAILED
         );
 
-        // Cancel booking
         booking.setBookingStatus(
                 BookingStatus.CANCELLED
         );
@@ -216,7 +214,6 @@ public class PaymentService {
         Payment savedPayment =
                 paymentRepository.save(payment);
 
-        // Create notification
         notificationService.createNotification(
                 booking.getUser().getId(),
                 "Payment Failed",
@@ -237,29 +234,20 @@ public class PaymentService {
             Long bookingId,
             String email) {
 
-        Booking booking = bookingRepository.findById(
-                        bookingId
-                )
+        Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() ->
-                        new BookingNotFoundException(
-                                bookingId
-                        ));
+                        new BookingNotFoundException(bookingId));
 
-        // Only booking owner can refund payment
         verifyBookingOwnership(
                 booking,
                 email
         );
 
-        // Find payment associated with booking
         Payment payment = paymentRepository
                 .findByBooking(booking)
                 .orElseThrow(() ->
-                        new PaymentNotFoundException(
-                                bookingId
-                        ));
+                        new PaymentNotFoundException(bookingId));
 
-        // Only SUCCESS payment can be refunded
         if (payment.getPaymentStatus()
                 != PaymentStatus.SUCCESS) {
 
@@ -270,12 +258,10 @@ public class PaymentService {
             );
         }
 
-        // Update payment status
         payment.setPaymentStatus(
                 PaymentStatus.REFUNDED
         );
 
-        // Update payment date
         payment.setPaymentDate(
                 LocalDateTime.now()
         );
@@ -283,7 +269,6 @@ public class PaymentService {
         Payment savedPayment =
                 paymentRepository.save(payment);
 
-        // Create notification
         notificationService.createNotification(
                 booking.getUser().getId(),
                 "Payment Refunded",
@@ -296,7 +281,7 @@ public class PaymentService {
     }
 
     // =========================================================
-    // VERIFY BOOKING OWNERSHIP
+    // OWNERSHIP VALIDATION
     // =========================================================
 
     private void verifyBookingOwnership(
@@ -307,7 +292,10 @@ public class PaymentService {
                 .getEmail()
                 .equals(email)) {
 
-            // Hide existence of another user's booking
+            /*
+             * Do not reveal that another user's booking/payment
+             * exists.
+             */
             throw new BookingNotFoundException(
                     booking.getId()
             );
@@ -315,7 +303,7 @@ public class PaymentService {
     }
 
     // =========================================================
-    // ENTITY → RESPONSE
+    // PAYMENT RESPONSE MAPPER
     // =========================================================
 
     private PaymentResponse toResponse(
@@ -348,15 +336,15 @@ public class PaymentService {
     }
 
     // =========================================================
-    // GENERATE PAYMENT REFERENCE
+    // PAYMENT REFERENCE GENERATOR
     // =========================================================
 
     private String generatePaymentReference() {
 
-        return "PAY-" +
-                UUID.randomUUID()
-                        .toString()
-                        .substring(0, 8)
-                        .toUpperCase();
+        return "PAY-"
+                + UUID.randomUUID()
+                .toString()
+                .substring(0, 8)
+                .toUpperCase();
     }
 }

@@ -33,6 +33,23 @@ public class GlobalExceptionHandler {
 
 
     // =========================================================
+    // EVENT HAS BOOKINGS
+    // =========================================================
+
+    @ExceptionHandler(EventHasBookingsException.class)
+    public ResponseEntity<ErrorResponse> handleEventHasBookingsException(
+            EventHasBookingsException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.CONFLICT,
+                ex.getMessage(),
+                request
+        );
+    }
+
+
+    // =========================================================
     // REVIEW OWNERSHIP
     // =========================================================
 

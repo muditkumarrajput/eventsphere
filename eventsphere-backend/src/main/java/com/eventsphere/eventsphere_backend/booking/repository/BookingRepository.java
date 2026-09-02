@@ -32,4 +32,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             Event event,
             BookingStatus bookingStatus
     );
+
+    // Check whether an event has any booking at all
+    boolean existsByEvent(Event event);
 }

@@ -41,5 +41,10 @@ public abstract class AbstractPostgresIntegrationTest {
                 "spring.jpa.hibernate.ddl-auto",
                 () -> "create-drop"
         );
+
+        registry.add(
+                "jwt.secret",
+                () -> "test-secret-key-that-is-at-least-32-characters-long"
+        );
     }
 }

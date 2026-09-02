@@ -13,6 +13,7 @@ import com.eventsphere.eventsphere_backend.common.exception.EventNotFoundExcepti
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
+import com.eventsphere.eventsphere_backend.payment.service.PaymentService;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ class BookingServiceTest {
 
     @Mock
     private BookingMapper bookingMapper;
+
+    @Mock
+    private PaymentService paymentService;
 
     @InjectMocks
     private BookingService bookingService;
@@ -127,7 +131,6 @@ class BookingServiceTest {
                 result.getBookingStatus()
         );
 
-        // Capture the Booking object created by the service
         ArgumentCaptor<Booking> bookingCaptor =
                 ArgumentCaptor.forClass(Booking.class);
 
@@ -137,7 +140,6 @@ class BookingServiceTest {
         Booking savedBooking =
                 bookingCaptor.getValue();
 
-        // Verify calculated booking data
         assertEquals(
                 2,
                 savedBooking.getNumberOfTickets()
@@ -167,7 +169,6 @@ class BookingServiceTest {
                 savedBooking.getBookingDate()
         );
 
-        // Verify booking reference format
         assertNotNull(
                 savedBooking.getBookingReference()
         );
@@ -441,7 +442,6 @@ class BookingServiceTest {
         when(eventRepository.findByIdForUpdate(3L))
                 .thenReturn(Optional.of(event));
 
-        // 8 already booked -> only 2 seats available
         when(bookingRepository.getBookedTickets(3L))
                 .thenReturn(8);
 
@@ -493,7 +493,6 @@ class BookingServiceTest {
         when(eventRepository.findByIdForUpdate(3L))
                 .thenReturn(Optional.of(event));
 
-        // 8 booked -> exactly 2 seats available
         when(bookingRepository.getBookedTickets(3L))
                 .thenReturn(8);
 
@@ -873,6 +872,49 @@ class BookingServiceTest {
 
         verify(bookingRepository)
                 .save(booking);
+
+        verifyNoInteractions(paymentService);
+    }
+
+
+    @Test
+    void shouldRefundPaymentAndCancelConfirmedBooking() {
+
+        // Arrange
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+
+        Booking booking = Booking.builder()
+                .id(1L)
+                .user(user)
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .build();
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(bookingRepository.findById(1L))
+                .thenReturn(Optional.of(booking));
+
+        // Act
+        bookingService.cancelBooking(
+                1L,
+                email
+        );
+
+        // Assert
+        assertEquals(
+                BookingStatus.CANCELLED,
+                booking.getBookingStatus()
+        );
+
+        verify(paymentService)
+                .refundPayment(1L, email);
+
+        verify(bookingRepository)
+                .save(booking);
     }
 
 
@@ -914,6 +956,8 @@ class BookingServiceTest {
 
         verify(bookingRepository, never())
                 .save(any(Booking.class));
+
+        verifyNoInteractions(paymentService);
     }
 
 
@@ -958,6 +1002,8 @@ class BookingServiceTest {
 
         verify(bookingRepository, never())
                 .save(any(Booking.class));
+
+        verifyNoInteractions(paymentService);
     }
 
 
@@ -993,6 +1039,8 @@ class BookingServiceTest {
 
         verify(bookingRepository, never())
                 .save(any(Booking.class));
+
+        verifyNoInteractions(paymentService);
     }
 
 
@@ -1018,5 +1066,6 @@ class BookingServiceTest {
                 .findByEmail(email);
 
         verifyNoInteractions(bookingRepository);
+        verifyNoInteractions(paymentService);
     }
 }

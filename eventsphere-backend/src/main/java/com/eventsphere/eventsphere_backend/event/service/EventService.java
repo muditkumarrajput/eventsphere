@@ -1,5 +1,7 @@
 package com.eventsphere.eventsphere_backend.event.service;
 
+import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
+import com.eventsphere.eventsphere_backend.common.exception.EventHasBookingsException;
 import com.eventsphere.eventsphere_backend.common.exception.EventNotFoundException;
 import com.eventsphere.eventsphere_backend.common.exception.EventOwnershipException;
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,15 +34,18 @@ public class EventService {
 
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
+    private final BookingRepository bookingRepository;
     private final EventMapper eventMapper;
 
     public EventService(
             EventRepository eventRepository,
             UserRepository userRepository,
+            BookingRepository bookingRepository,
             EventMapper eventMapper) {
 
         this.eventRepository = eventRepository;
         this.userRepository = userRepository;
+        this.bookingRepository = bookingRepository;
         this.eventMapper = eventMapper;
     }
 
@@ -143,6 +149,7 @@ public class EventService {
     // DELETE EVENT
     // =========================================================
 
+    @Transactional
     public void deleteEvent(
             Long id,
             String email) {
@@ -155,8 +162,18 @@ public class EventService {
                 .orElseThrow(() ->
                         new UserNotFoundException(email));
 
-        // Check ownership before deletion
+        // Check ownership before checking whether deletion is allowed
         validateOwnership(event, user);
+
+        /*
+         * Do not physically delete an event that has bookings.
+         *
+         * Bookings represent historical transactions and may
+         * have associated payment records.
+         */
+        if (bookingRepository.existsByEvent(event)) {
+            throw new EventHasBookingsException(id);
+        }
 
         eventRepository.delete(event);
     }

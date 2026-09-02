@@ -253,6 +253,54 @@ class PaymentServiceTest {
     }
 
 
+    @Test
+    void shouldNotCreatePaymentForCancelledBooking() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+        user.setEmail(email);
+
+        Booking booking = Booking.builder()
+                .id(10L)
+                .bookingReference("EVT-ABC12345")
+                .totalAmount(new BigDecimal("2000.00"))
+                .bookingStatus(BookingStatus.CANCELLED)
+                .user(user)
+                .build();
+
+        CreatePaymentRequest request =
+                new CreatePaymentRequest(10L);
+
+        when(bookingRepository.findById(10L))
+                .thenReturn(Optional.of(booking));
+
+        assertThrows(
+                PaymentStateTransitionException.class,
+                () -> paymentService.createPayment(
+                        request,
+                        email
+                )
+        );
+
+        verify(bookingRepository)
+                .findById(10L);
+
+        verify(
+                paymentRepository,
+                never()
+        ).existsByBooking(booking);
+
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(notificationService);
+    }
+
+
     // =========================================================
     // GET PAYMENT BY ID
     // =========================================================
@@ -792,6 +840,8 @@ class PaymentServiceTest {
                 notificationService
         );
     }
+
+
     // =========================================================
     // REFUND PAYMENT
     // =========================================================
@@ -819,9 +869,6 @@ class PaymentServiceTest {
                 .paymentStatus(PaymentStatus.SUCCESS)
                 .booking(booking)
                 .build();
-
-        CreatePaymentRequest request =
-                new CreatePaymentRequest(10L);
 
         when(bookingRepository.findById(10L))
                 .thenReturn(Optional.of(booking));
@@ -1053,6 +1100,132 @@ class PaymentServiceTest {
                 paymentRepository,
                 never()
         ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                notificationService
+        );
+    }
+
+
+    // =========================================================
+    // BOOKING STATE VALIDATION
+    // =========================================================
+
+    @Test
+    void shouldNotMarkPaymentSuccessfulWhenBookingIsCancelled() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+        user.setEmail(email);
+
+        Booking booking = Booking.builder()
+                .id(10L)
+                .bookingReference("EVT-ABC12345")
+                .bookingStatus(BookingStatus.CANCELLED)
+                .user(user)
+                .build();
+
+        Payment payment = Payment.builder()
+                .id(1L)
+                .paymentReference("PAY-ABC12345")
+                .amount(new BigDecimal("2000.00"))
+                .paymentStatus(PaymentStatus.PENDING)
+                .booking(booking)
+                .build();
+
+        when(paymentRepository.findById(1L))
+                .thenReturn(Optional.of(payment));
+
+        assertThrows(
+                PaymentStateTransitionException.class,
+                () -> paymentService.markPaymentSuccessful(
+                        1L,
+                        email
+                )
+        );
+
+        assertEquals(
+                PaymentStatus.PENDING,
+                payment.getPaymentStatus()
+        );
+
+        assertEquals(
+                BookingStatus.CANCELLED,
+                booking.getBookingStatus()
+        );
+
+        verify(paymentRepository)
+                .findById(1L);
+
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verifyNoInteractions(
+                bookingRepository,
+                notificationService
+        );
+    }
+    @Test
+    void shouldNotMarkPaymentFailedWhenBookingIsCancelled() {
+
+        String email = "user@test.com";
+
+        User user = new User();
+        user.setId(5L);
+        user.setEmail(email);
+
+        Booking booking = Booking.builder()
+                .id(10L)
+                .bookingReference("EVT-ABC12345")
+                .bookingStatus(BookingStatus.CANCELLED)
+                .user(user)
+                .build();
+
+        Payment payment = Payment.builder()
+                .id(1L)
+                .paymentReference("PAY-ABC12345")
+                .amount(new BigDecimal("2000.00"))
+                .paymentStatus(PaymentStatus.PENDING)
+                .booking(booking)
+                .build();
+
+        when(paymentRepository.findById(1L))
+                .thenReturn(Optional.of(payment));
+
+        assertThrows(
+                PaymentStateTransitionException.class,
+                () -> paymentService.markPaymentFailed(
+                        1L,
+                        email
+                )
+        );
+
+        assertEquals(
+                PaymentStatus.PENDING,
+                payment.getPaymentStatus()
+        );
+
+        assertEquals(
+                BookingStatus.CANCELLED,
+                booking.getBookingStatus()
+        );
+
+        verify(paymentRepository)
+                .findById(1L);
+
+        verify(
+                paymentRepository,
+                never()
+        ).save(any(Payment.class));
+
+        verify(
+                bookingRepository,
+                never()
+        ).save(any(Booking.class));
 
         verifyNoInteractions(
                 notificationService

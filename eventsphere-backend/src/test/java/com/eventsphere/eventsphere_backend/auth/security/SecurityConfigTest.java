@@ -1,51 +1,44 @@
 package com.eventsphere.eventsphere_backend.auth.security;
 
 import com.eventsphere.eventsphere_backend.booking.service.BookingService;
-import com.eventsphere.eventsphere_backend.event.dto.EventResponse;
 import com.eventsphere.eventsphere_backend.event.service.EventService;
+import com.eventsphere.eventsphere_backend.integration.AbstractPostgresIntegrationTest;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-
-@SpringBootTest
 @AutoConfigureMockMvc
-class SecurityConfigTest {
+class SecurityConfigTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private JwtService jwtService;
 
-    @MockBean
+    @MockitoBean
     private UserRepository userRepository;
 
-    @MockBean
+    @MockitoBean
     private EventService eventService;
 
-    @MockBean
+    @MockitoBean
     private BookingService bookingService;
-
 
     // =========================================================
     // PUBLIC EVENT API
@@ -63,7 +56,6 @@ class SecurityConfigTest {
                 )
                 .andExpect(status().isOk());
     }
-
 
     // =========================================================
     // PROTECTED BOOKING API
@@ -101,7 +93,6 @@ class SecurityConfigTest {
                                 )
                 );
     }
-
 
     // =========================================================
     // INVALID JWT
@@ -142,7 +133,6 @@ class SecurityConfigTest {
                                 .value("Unauthorized")
                 );
     }
-
 
     // =========================================================
     // USER CANNOT ACCESS ADMIN ENDPOINT
@@ -194,7 +184,6 @@ class SecurityConfigTest {
                 );
     }
 
-
     // =========================================================
     // ADMIN CAN ACCESS ADMIN ENDPOINT
     // =========================================================
@@ -234,7 +223,6 @@ class SecurityConfigTest {
                 .andExpect(status().isOk());
     }
 
-
     // =========================================================
     // ORGANIZER IS AUTHENTICATED
     // =========================================================
@@ -250,8 +238,9 @@ class SecurityConfigTest {
         organizer.setPassword("password");
         organizer.setRole(Role.ORGANIZER);
 
-        when(jwtService.extractEmail("organizer-token"))
-                .thenReturn("organizer@test.com");
+        when(jwtService.extractEmail(
+                "organizer-token"
+        )).thenReturn("organizer@test.com");
 
         when(userRepository.findByEmail(
                 "organizer@test.com"
