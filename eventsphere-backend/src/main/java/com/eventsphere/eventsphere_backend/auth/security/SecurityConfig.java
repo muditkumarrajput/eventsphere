@@ -99,6 +99,15 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // -------------------------------------------------
+                        // Public Actuator Health Endpoint
+                        // Used by deployment platforms and monitoring tools
+                        // to check whether the application is healthy.
+                        // -------------------------------------------------
+                        .requestMatchers(
+                                "/actuator/health"
+                        ).permitAll()
+
+                        // -------------------------------------------------
                         // Everything else requires authentication
                         // -------------------------------------------------
                         .anyRequest().authenticated()
