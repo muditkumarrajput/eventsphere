@@ -1,6 +1,9 @@
 package com.eventsphere.eventsphere_backend.integration;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -17,6 +20,9 @@ public abstract class AbstractPostgresIntegrationTest {
     static {
         postgres.start();
     }
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @DynamicPropertySource
     static void configureProperties(
@@ -46,5 +52,21 @@ public abstract class AbstractPostgresIntegrationTest {
                 "jwt.secret",
                 () -> "test-secret-key-that-is-at-least-32-characters-long"
         );
+    }
+
+    @BeforeEach
+    void cleanDatabase() {
+
+        jdbcTemplate.execute("""
+                TRUNCATE TABLE
+                    payments,
+                    bookings,
+                    favorites,
+                    reviews,
+                    notifications,
+                    events,
+                    users
+                RESTART IDENTITY CASCADE
+                """);
     }
 }

@@ -31,8 +31,6 @@ class EventRepositoryIntegrationTest
     @BeforeEach
     void setUp() {
 
-        eventRepository.deleteAll();
-        userRepository.deleteAll();
 
         organizer = new User();
         organizer.setEmail("organizer@test.com");
