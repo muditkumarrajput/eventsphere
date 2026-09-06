@@ -22,7 +22,6 @@ class UserRepositoryIntegrationTest
 
     @BeforeEach
     void setUp() {
-        userRepository.deleteAll();
     }
 
     @Test
