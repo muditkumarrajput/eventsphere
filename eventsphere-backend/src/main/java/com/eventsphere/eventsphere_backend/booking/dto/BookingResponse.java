@@ -19,7 +19,17 @@ public class BookingResponse {
 
     private Long userId;
 
+    private String userName;
+
+    private String userEmail;
+
     private Long eventId;
+
+    private String eventTitle;
+
+    private String eventLocation;
+
+    private LocalDateTime eventDate;
 
     private Integer numberOfTickets;
 

@@ -191,8 +191,10 @@ class AuthServiceTest {
                 encodedPassword
         )).thenReturn(true);
 
-        when(jwtService.generateToken(email))
-                .thenReturn(token);
+        when(jwtService.generateToken(
+                email,
+                Role.USER
+        )).thenReturn(token);
 
         AuthResponse result =
                 authService.login(request);
@@ -214,7 +216,10 @@ class AuthServiceTest {
                 );
 
         verify(jwtService)
-                .generateToken(email);
+                .generateToken(
+                        email,
+                        Role.USER
+                );
     }
 
 

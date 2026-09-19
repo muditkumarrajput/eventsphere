@@ -13,7 +13,15 @@ public class BookingMapper {
                 .id(booking.getId())
                 .bookingReference(booking.getBookingReference())
                 .userId(booking.getUser().getId())
+                .userName(booking.getUser().getName())
+                .userEmail(booking.getUser().getEmail())
                 .eventId(booking.getEvent().getId())
+
+                // Event information
+                .eventTitle(booking.getEvent().getTitle())
+                .eventLocation(booking.getEvent().getLocation())
+                .eventDate(booking.getEvent().getEventDate())
+
                 .numberOfTickets(booking.getNumberOfTickets())
                 .totalAmount(booking.getTotalAmount())
                 .bookingStatus(booking.getBookingStatus())

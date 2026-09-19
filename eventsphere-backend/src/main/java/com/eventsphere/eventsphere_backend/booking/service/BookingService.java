@@ -12,6 +12,7 @@ import com.eventsphere.eventsphere_backend.common.exception.EventCapacityExceede
 import com.eventsphere.eventsphere_backend.common.exception.EventNotFoundException;
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
 import com.eventsphere.eventsphere_backend.payment.service.PaymentService;
 import com.eventsphere.eventsphere_backend.user.entity.User;
@@ -71,6 +72,11 @@ public class BookingService {
                                 request.getEventId()
                         ));
 
+        // Prevent booking a cancelled event
+        if (event.getStatus() == EventStatus.CANCELLED) {
+            throw new EventNotFoundException(event.getId());
+        }
+
         // Calculate currently booked tickets
         Integer bookedTickets =
                 bookingRepository.getBookedTickets(event.getId());
@@ -81,7 +87,6 @@ public class BookingService {
 
         // Validate requested tickets
         if (request.getNumberOfTickets() > availableSeats) {
-
             throw new EventCapacityExceededException();
         }
 
@@ -152,6 +157,8 @@ public class BookingService {
 
     // =========================================================
     // GET BOOKING BY ID
+    // NORMAL USER
+    // OWNERSHIP CHECKED
     // =========================================================
 
     public BookingResponse getBookingById(
@@ -173,6 +180,22 @@ public class BookingService {
             // Hide another user's booking
             throw new BookingNotFoundException(id);
         }
+
+        return bookingMapper.toResponse(booking);
+    }
+
+    // =========================================================
+    // GET BOOKING BY ID
+    // ADMIN ONLY
+    // NO OWNERSHIP CHECK
+    // =========================================================
+
+    public BookingResponse getBookingByIdForAdmin(
+            Long id) {
+
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() ->
+                        new BookingNotFoundException(id));
 
         return bookingMapper.toResponse(booking);
     }

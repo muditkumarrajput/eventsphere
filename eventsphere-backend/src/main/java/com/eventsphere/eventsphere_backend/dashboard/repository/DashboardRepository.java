@@ -14,12 +14,19 @@ public interface DashboardRepository extends JpaRepository<Event, Long> {
     // Dashboard Summary
     // ===========================
 
+    @Query("""
+            SELECT COUNT(e)
+            FROM Event e
+            WHERE e.createdBy = :organizer
+            AND e.status = 'ACTIVE'
+            """)
     long countByCreatedBy(User organizer);
 
     @Query("""
             SELECT COUNT(e)
             FROM Event e
             WHERE e.createdBy = :organizer
+            AND e.status = 'ACTIVE'
             AND e.eventDate > CURRENT_TIMESTAMP
             """)
     long countUpcomingEvents(User organizer);
@@ -28,6 +35,7 @@ public interface DashboardRepository extends JpaRepository<Event, Long> {
             SELECT COUNT(e)
             FROM Event e
             WHERE e.createdBy = :organizer
+            AND e.status = 'ACTIVE'
             AND e.eventDate < CURRENT_TIMESTAMP
             """)
     long countCompletedEvents(User organizer);
@@ -36,6 +44,7 @@ public interface DashboardRepository extends JpaRepository<Event, Long> {
             SELECT COUNT(b)
             FROM Booking b
             WHERE b.event.createdBy = :organizer
+            AND b.event.status = 'ACTIVE'
             AND b.bookingStatus = 'CONFIRMED'
             """)
     long countTotalBookings(User organizer);
@@ -44,6 +53,7 @@ public interface DashboardRepository extends JpaRepository<Event, Long> {
             SELECT COALESCE(SUM(b.numberOfTickets),0)
             FROM Booking b
             WHERE b.event.createdBy = :organizer
+            AND b.event.status = 'ACTIVE'
             AND b.bookingStatus = 'CONFIRMED'
             """)
     Integer sumTicketsSold(User organizer);
@@ -52,6 +62,7 @@ public interface DashboardRepository extends JpaRepository<Event, Long> {
             SELECT COALESCE(SUM(b.totalAmount),0)
             FROM Booking b
             WHERE b.event.createdBy = :organizer
+            AND b.event.status = 'ACTIVE'
             AND b.bookingStatus = 'CONFIRMED'
             """)
     BigDecimal sumRevenue(User organizer);
@@ -65,6 +76,7 @@ public interface DashboardRepository extends JpaRepository<Event, Long> {
             e.id,
             e.title,
             e.capacity,
+            e.status,
             COALESCE(SUM(b.numberOfTickets),0),
             e.capacity - COALESCE(SUM(b.numberOfTickets),0),
             CASE
@@ -80,6 +92,7 @@ public interface DashboardRepository extends JpaRepository<Event, Long> {
             e.id,
             e.title,
             e.capacity,
+            e.status,
             e.eventDate
         ORDER BY e.eventDate ASC
         """)

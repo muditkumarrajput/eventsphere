@@ -1,6 +1,5 @@
-import { createContext, useContext, useState } from "react";
-
-const AuthContext = createContext();
+import { useState } from "react";
+import { AuthContext } from "./AuthContext.js";
 
 function getRoleFromToken(token) {
     if (!token) {
@@ -63,10 +62,6 @@ function AuthProvider({ children }) {
             {children}
         </AuthContext.Provider>
     );
-}
-
-export function useAuth() {
-    return useContext(AuthContext);
 }
 
 export default AuthProvider;

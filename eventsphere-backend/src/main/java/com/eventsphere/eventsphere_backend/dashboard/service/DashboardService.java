@@ -4,6 +4,7 @@ import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundExceptio
 import com.eventsphere.eventsphere_backend.dashboard.dto.EventInsightResponse;
 import com.eventsphere.eventsphere_backend.dashboard.dto.OrganizerDashboardResponse;
 import com.eventsphere.eventsphere_backend.dashboard.repository.DashboardRepository;
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -73,10 +74,11 @@ public class DashboardService {
                         .eventId(((Number) row[0]).longValue())
                         .title((String) row[1])
                         .capacity(((Number) row[2]).intValue())
-                        .ticketsSold(((Number) row[3]).longValue())
-                        .remainingSeats(((Number) row[4]).intValue())
-                        .occupancyPercentage(((Number) row[5]).doubleValue())
-                        .revenue((BigDecimal) row[6])
+                        .status((EventStatus) row[3])
+                        .ticketsSold(((Number) row[4]).longValue())
+                        .remainingSeats(((Number) row[5]).intValue())
+                        .occupancyPercentage(((Number) row[6]).doubleValue())
+                        .revenue((BigDecimal) row[7])
                         .build())
                 .toList();
     }

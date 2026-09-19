@@ -1,6 +1,7 @@
 package com.eventsphere.eventsphere_backend.event.dto;
 
 import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -28,6 +29,8 @@ public class EventResponse {
     private BigDecimal ticketPrice;
 
     private EventCategory category;
+
+    private EventStatus status;
 
     private LocalDateTime createdAt;
 

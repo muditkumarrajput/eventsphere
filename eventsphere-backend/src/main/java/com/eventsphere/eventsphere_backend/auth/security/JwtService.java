@@ -1,5 +1,6 @@
 package com.eventsphere.eventsphere_backend.auth.security;
 
+import com.eventsphere.eventsphere_backend.user.entity.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -32,10 +33,13 @@ public class JwtService {
     // GENERATE JWT TOKEN
     // =========================================================
 
-    public String generateToken(String email) {
+    public String generateToken(
+            String email,
+            Role role) {
 
         return Jwts.builder()
                 .subject(email)
+                .claim("role", role.name())
                 .issuedAt(new Date())
                 .expiration(
                         new Date(

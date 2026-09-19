@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
-import AuthProvider from "./context/AuthContext";
+import AuthProvider from "./context/AuthContext.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
 import Home from "./pages/Home";
@@ -13,21 +13,27 @@ import Booking from "./pages/Booking";
 import Payment from "./pages/Payment";
 import MyBookings from "./pages/MyBookings";
 import BookingDetails from "./pages/BookingDetails";
+import AdminBookingDetails from "./pages/AdminBookingDetails";
 import Favorites from "./pages/Favorites";
 import Notifications from "./pages/Notifications";
 import OrganizerDashboard from "./pages/OrganizerDashboard";
+import OrganizerRequest from "./pages/OrganizerRequest";
+import AdminBookings from "./pages/AdminBookings";
+import AdminOrganizerRequests from "./pages/AdminOrganizerRequests";
 
 function App() {
     return (
         <AuthProvider>
+
             <BrowserRouter>
+
                 <Navbar />
 
                 <Routes>
 
-                    {/* =========================
+                    {/* =====================================================
                         PUBLIC ROUTES
-                       ========================= */}
+                    ===================================================== */}
 
                     <Route
                         path="/"
@@ -54,16 +60,38 @@ function App() {
                         element={<EventDetails />}
                     />
 
-                    {/* =========================
-                        AUTHENTICATED ROUTES
-                       ========================= */}
 
-                    <Route element={<ProtectedRoute />}>
+                    {/* =====================================================
+                        USER-ONLY BOOKING ROUTE
+                    ===================================================== */}
+
+                    <Route
+                        element={
+                            <ProtectedRoute
+                                allowedRoles={[
+                                    "USER"
+                                ]}
+                            />
+                        }
+                    >
 
                         <Route
                             path="/events/:id/book"
                             element={<Booking />}
                         />
+
+                    </Route>
+
+
+                    {/* =====================================================
+                        AUTHENTICATED ROUTES
+                    ===================================================== */}
+
+                    <Route
+                        element={
+                            <ProtectedRoute />
+                        }
+                    >
 
                         <Route
                             path="/payments/:id"
@@ -90,33 +118,80 @@ function App() {
                             element={<Notifications />}
                         />
 
+                        <Route
+                            path="/organizer-request"
+                            element={<OrganizerRequest />}
+                        />
+
                     </Route>
 
-                    {/* =========================
+
+                    {/* =====================================================
                         ORGANIZER / ADMIN ROUTES
-                       ========================= */}
+                    ===================================================== */}
 
                     <Route
                         element={
                             <ProtectedRoute
                                 allowedRoles={[
                                     "ADMIN",
-                                    "ORGANIZER",
+                                    "ORGANIZER"
                                 ]}
                             />
                         }
                     >
+
                         <Route
                             path="/organizer"
                             element={
                                 <OrganizerDashboard />
                             }
                         />
+
+                    </Route>
+
+
+                    {/* =====================================================
+                        ADMIN-ONLY ROUTES
+                    ===================================================== */}
+
+                    <Route
+                        element={
+                            <ProtectedRoute
+                                allowedRoles={[
+                                    "ADMIN"
+                                ]}
+                            />
+                        }
+                    >
+
+                        <Route
+                            path="/admin/bookings"
+                            element={
+                                <AdminBookings />
+                            }
+                        />
+
+                        <Route
+                            path="/admin/bookings/:id"
+                            element={
+                                <AdminBookingDetails />
+                            }
+                        />
+
+                        <Route
+                            path="/admin/organizer-requests"
+                            element={
+                                <AdminOrganizerRequests />
+                            }
+                        />
+
                     </Route>
 
                 </Routes>
 
             </BrowserRouter>
+
         </AuthProvider>
     );
 }

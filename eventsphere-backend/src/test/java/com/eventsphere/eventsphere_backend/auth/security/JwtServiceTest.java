@@ -1,5 +1,7 @@
 package com.eventsphere.eventsphere_backend.auth.security;
 
+import com.eventsphere.eventsphere_backend.user.entity.Role;
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +38,8 @@ class JwtServiceTest {
     void shouldGenerateToken() {
 
         String token = jwtService.generateToken(
-                "user@example.com"
+                "user@example.com",
+                Role.USER
         );
 
         assertNotNull(token);
@@ -52,7 +55,11 @@ class JwtServiceTest {
 
         String email = "user@example.com";
 
-        String token = jwtService.generateToken(email);
+        String token =
+                jwtService.generateToken(
+                        email,
+                        Role.USER
+                );
 
         String extractedEmail =
                 jwtService.extractEmail(token);
@@ -72,12 +79,17 @@ class JwtServiceTest {
 
         String email = "user@example.com";
 
-        String token = jwtService.generateToken(email);
+        String token =
+                jwtService.generateToken(
+                        email,
+                        Role.USER
+                );
 
-        String subject = jwtService.extractClaim(
-                token,
-                Claims -> Claims.getSubject()
-        );
+        String subject =
+                jwtService.extractClaim(
+                        token,
+                        Claims::getSubject
+                );
 
         assertEquals(
                 email,
@@ -94,7 +106,11 @@ class JwtServiceTest {
 
         String email = "user@example.com";
 
-        String token = jwtService.generateToken(email);
+        String token =
+                jwtService.generateToken(
+                        email,
+                        Role.USER
+                );
 
         boolean result =
                 jwtService.isTokenValid(
@@ -112,9 +128,11 @@ class JwtServiceTest {
     @Test
     void shouldReturnFalseWhenEmailDoesNotMatch() {
 
-        String token = jwtService.generateToken(
-                "user@example.com"
-        );
+        String token =
+                jwtService.generateToken(
+                        "user@example.com",
+                        Role.USER
+                );
 
         boolean result =
                 jwtService.isTokenValid(
@@ -142,7 +160,10 @@ class JwtServiceTest {
                 );
 
         String token =
-                expiredJwtService.generateToken(email);
+                expiredJwtService.generateToken(
+                        email,
+                        Role.USER
+                );
 
         Thread.sleep(50);
 

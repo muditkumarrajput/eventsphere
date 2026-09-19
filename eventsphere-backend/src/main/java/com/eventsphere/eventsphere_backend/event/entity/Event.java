@@ -31,6 +31,10 @@ import java.util.List;
                 @Index(
                         name = "idx_events_ticket_price",
                         columnList = "ticket_price"
+                ),
+                @Index(
+                        name = "idx_events_status",
+                        columnList = "status"
                 )
         }
 )
@@ -66,6 +70,11 @@ public class Event {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EventCategory category;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private EventStatus status = EventStatus.ACTIVE;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)

@@ -31,11 +31,11 @@ public class BookingController {
 
     // =========================================================
     // CREATE BOOKING
-    // AUTHENTICATED USERS
+    // USER ONLY
     // =========================================================
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('USER')")
     @Operation(
             summary = "Create a booking",
             description = "Creates a new booking for an authenticated user"
@@ -133,7 +133,7 @@ public class BookingController {
 
     // =========================================================
     // GET BOOKING BY ID
-    // AUTHENTICATED USERS
+    // NORMAL USER
     // OWNERSHIP CHECKED IN SERVICE
     // =========================================================
 
@@ -169,6 +169,41 @@ public class BookingController {
                 id,
                 authentication.getName()
         );
+    }
+
+    // =========================================================
+    // GET ANY BOOKING BY ID
+    // ADMIN ONLY
+    // =========================================================
+
+    @GetMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Get any booking by ID",
+            description = "Allows administrators to view any booking without an ownership restriction"
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Booking retrieved successfully"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Authentication is required"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "User is not an administrator"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Booking not found"
+            )
+    })
+    public BookingResponse getBookingByIdForAdmin(
+            @PathVariable Long id) {
+
+        return bookingService.getBookingByIdForAdmin(id);
     }
 
     // =========================================================

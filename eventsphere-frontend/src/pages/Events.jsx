@@ -9,48 +9,62 @@ function Events() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        fetchEvents();
-        fetchFavorites();
+        const loadEvents = async () => {
+            try {
+                const response = await api.get("/events");
+                setEvents(response.data);
+            } catch (error) {
+                console.error(
+                    "Failed to load events:",
+                    error
+                );
+
+                setError("Failed to load events.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const loadFavorites = async () => {
+            try {
+                const response = await api.get("/favorites");
+
+                const favoriteIds = response.data.map(
+                    (favorite) => favorite.eventId
+                );
+
+                setFavoriteEventIds(favoriteIds);
+            } catch (error) {
+                console.error(
+                    "Failed to load favorites:",
+                    error
+                );
+            }
+        };
+
+        loadEvents();
+        loadFavorites();
     }, []);
 
-    const fetchEvents = async () => {
-        try {
-            const response = await api.get("/events");
-            setEvents(response.data);
-        } catch (error) {
-            console.error("Failed to load events:", error);
-            setError("Failed to load events.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchFavorites = async () => {
-        try {
-            const response = await api.get("/favorites");
-
-            const favoriteIds = response.data.map(
-                (favorite) => favorite.eventId
-            );
-
-            setFavoriteEventIds(favoriteIds);
-        } catch (error) {
-            console.error("Failed to load favorites:", error);
-        }
-    };
-
     const toggleFavorite = async (eventId) => {
-        const isFavorite = favoriteEventIds.includes(eventId);
+        const isFavorite =
+            favoriteEventIds.includes(eventId);
 
         try {
             if (isFavorite) {
-                await api.delete(`/favorites/${eventId}`);
+                await api.delete(
+                    `/favorites/${eventId}`
+                );
 
                 setFavoriteEventIds((currentIds) =>
-                    currentIds.filter((id) => id !== eventId)
+                    currentIds.filter(
+                        (id) => id !== eventId
+                    )
                 );
             } else {
-                await api.post(`/favorites/${eventId}`);
+                await api.post(
+                    `/favorites/${eventId}`
+                );
 
                 setFavoriteEventIds((currentIds) => [
                     ...currentIds,
@@ -58,8 +72,14 @@ function Events() {
                 ]);
             }
         } catch (error) {
-            console.error("Failed to update favorite:", error);
-            setError("Failed to update favorite.");
+            console.error(
+                "Failed to update favorite:",
+                error
+            );
+
+            setError(
+                "Failed to update favorite."
+            );
         }
     };
 
@@ -87,7 +107,9 @@ function Events() {
                 <div className="events-grid">
                     {events.map((event) => {
                         const isFavorite =
-                            favoriteEventIds.includes(event.id);
+                            favoriteEventIds.includes(
+                                event.id
+                            );
 
                         return (
                             <div
@@ -97,14 +119,17 @@ function Events() {
                                 <div>
                                     <h2>{event.title}</h2>
 
-                                    <p>{event.description}</p>
+                                    <p>
+                                        {event.description}
+                                    </p>
 
                                     <p>
                                         📍 {event.location}
                                     </p>
 
                                     <p>
-                                        💰 ₹{event.ticketPrice}
+                                        💰 ₹
+                                        {event.ticketPrice}
                                     </p>
 
                                     <Link
@@ -122,7 +147,9 @@ function Events() {
                                             : "favorite-button"
                                     }
                                     onClick={() =>
-                                        toggleFavorite(event.id)
+                                        toggleFavorite(
+                                            event.id
+                                        )
                                     }
                                 >
                                     {isFavorite

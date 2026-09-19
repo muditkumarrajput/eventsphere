@@ -2,6 +2,7 @@ package com.eventsphere.eventsphere_backend.event.specification;
 
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -22,15 +23,20 @@ public class EventSpecification {
                 return null;
             }
 
-            String searchKeyword = "%" + keyword.toLowerCase() + "%";
+            String searchKeyword =
+                    "%" + keyword.toLowerCase() + "%";
 
             return criteriaBuilder.or(
                     criteriaBuilder.like(
-                            criteriaBuilder.lower(root.get("title")),
+                            criteriaBuilder.lower(
+                                    root.get("title")
+                            ),
                             searchKeyword
                     ),
                     criteriaBuilder.like(
-                            criteriaBuilder.lower(root.get("description")),
+                            criteriaBuilder.lower(
+                                    root.get("description")
+                            ),
                             searchKeyword
                     )
             );
@@ -65,7 +71,9 @@ public class EventSpecification {
             }
 
             return criteriaBuilder.like(
-                    criteriaBuilder.lower(root.get("location")),
+                    criteriaBuilder.lower(
+                            root.get("location")
+                    ),
                     "%" + location.toLowerCase() + "%"
             );
         };
@@ -137,5 +145,15 @@ public class EventSpecification {
                     dateTime
             );
         };
+    }
+
+    // Only active events
+    public static Specification<Event> isActive() {
+
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(
+                        root.get("status"),
+                        EventStatus.ACTIVE
+                );
     }
 }

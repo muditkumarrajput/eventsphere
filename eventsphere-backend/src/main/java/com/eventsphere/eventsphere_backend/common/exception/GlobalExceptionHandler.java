@@ -421,4 +421,53 @@ public class GlobalExceptionHandler {
                 .status(status)
                 .body(errorResponse);
     }
+// =========================================================
+// ORGANIZER REQUEST ALREADY EXISTS
+// =========================================================
+
+    @ExceptionHandler(OrganizerRequestAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleOrganizerRequestAlreadyExistsException(
+            OrganizerRequestAlreadyExistsException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.CONFLICT,
+                ex.getMessage(),
+                request
+        );
+    }
+
+
+// =========================================================
+// ORGANIZER REQUEST ALREADY PROCESSED
+// =========================================================
+
+    @ExceptionHandler(OrganizerRequestAlreadyProcessedException.class)
+    public ResponseEntity<ErrorResponse> handleOrganizerRequestAlreadyProcessedException(
+            OrganizerRequestAlreadyProcessedException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.CONFLICT,
+                ex.getMessage(),
+                request
+        );
+    }
+
+
+// =========================================================
+// ORGANIZER REQUEST NOT FOUND
+// =========================================================
+
+    @ExceptionHandler(OrganizerRequestNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleOrganizerRequestNotFoundException(
+            OrganizerRequestNotFoundException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.NOT_FOUND,
+                ex.getMessage(),
+                request
+        );
+    }
 }

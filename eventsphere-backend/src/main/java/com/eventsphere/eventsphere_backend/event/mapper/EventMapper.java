@@ -3,6 +3,7 @@ package com.eventsphere.eventsphere_backend.event.mapper;
 import com.eventsphere.eventsphere_backend.event.dto.CreateEventRequest;
 import com.eventsphere.eventsphere_backend.event.dto.EventResponse;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,6 +19,7 @@ public class EventMapper {
                 .capacity(request.getCapacity())
                 .ticketPrice(request.getTicketPrice())
                 .category(request.getCategory())
+                .status(EventStatus.ACTIVE)
                 .build();
     }
 
@@ -32,9 +34,9 @@ public class EventMapper {
                 .capacity(event.getCapacity())
                 .ticketPrice(event.getTicketPrice())
                 .category(event.getCategory())
+                .status(event.getStatus())
                 .createdAt(event.getCreatedAt())
                 .updatedAt(event.getUpdatedAt())
                 .build();
     }
-
 }

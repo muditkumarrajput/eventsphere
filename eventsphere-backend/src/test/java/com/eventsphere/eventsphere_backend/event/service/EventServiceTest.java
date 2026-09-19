@@ -10,6 +10,7 @@ import com.eventsphere.eventsphere_backend.event.dto.EventResponse;
 import com.eventsphere.eventsphere_backend.event.dto.UpdateEventRequest;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import com.eventsphere.eventsphere_backend.event.mapper.EventMapper;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
@@ -1240,6 +1241,7 @@ class EventServiceTest {
 
         Event event = new Event();
         event.setId(8L);
+        event.setStatus(EventStatus.ACTIVE);
 
         EventResponse response =
                 EventResponse.builder()
@@ -1253,8 +1255,12 @@ class EventServiceTest {
                         1
                 );
 
-        when(eventRepository.findAll(pageable))
-                .thenReturn(eventPage);
+        when(
+                eventRepository.findAll(
+                        any(Specification.class),
+                        eq(pageable)
+                )
+        ).thenReturn(eventPage);
 
         when(eventMapper.toResponse(event))
                 .thenReturn(response);
@@ -1280,7 +1286,10 @@ class EventServiceTest {
         );
 
         verify(eventRepository)
-                .findAll(pageable);
+                .findAll(
+                        any(Specification.class),
+                        eq(pageable)
+                );
     }
 
 

@@ -1,19 +1,39 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
+import { useAuth } from "../context/useAuth.jsx";
 
 function EventDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
 
+    const { role } = useAuth();
+
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    const normalizedRoles =
+        Array.isArray(role)
+            ? role
+            : [role];
+
+    const isUser =
+        normalizedRoles.some((userRole) => {
+            const normalizedRole =
+                String(userRole)
+                    .replace("ROLE_", "")
+                    .toUpperCase();
+
+            return normalizedRole === "USER";
+        });
+
     useEffect(() => {
         const fetchEvent = async () => {
             try {
-                const response = await api.get(`/events/${id}`);
+                const response = await api.get(
+                    `/events/${id}`
+                );
 
                 setEvent(response.data);
             } catch (error) {
@@ -22,7 +42,9 @@ function EventDetails() {
                     error
                 );
 
-                setError("Failed to load event.");
+                setError(
+                    "Failed to load event."
+                );
             } finally {
                 setLoading(false);
             }
@@ -49,7 +71,9 @@ function EventDetails() {
 
                 <button
                     className="back-button"
-                    onClick={() => navigate("/events")}
+                    onClick={() =>
+                        navigate("/events")
+                    }
                 >
                     ← Back to Events
                 </button>
@@ -71,7 +95,9 @@ function EventDetails() {
 
             <button
                 className="back-button"
-                onClick={() => navigate("/events")}
+                onClick={() =>
+                    navigate("/events")
+                }
             >
                 ← Back to Events
             </button>
@@ -113,21 +139,23 @@ function EventDetails() {
 
                 </div>
 
-                <button
-                    className="book-button"
-                    onClick={() =>
-                        navigate(
-                            `/events/${event.id}/book`
-)
-}
->
-Book Tickets
-</button>
+                {isUser && (
+                    <button
+                        className="book-button"
+                        onClick={() =>
+                            navigate(
+                                `/events/${event.id}/book`
+                            )
+                        }
+                    >
+                        Book Tickets
+                    </button>
+                )}
 
-</div>
+            </div>
 
-</div>
-);
+        </div>
+    );
 }
 
 export default EventDetails;

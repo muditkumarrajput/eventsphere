@@ -1,7 +1,9 @@
 package com.eventsphere.eventsphere_backend.event.service;
 
+import com.eventsphere.eventsphere_backend.booking.entity.Booking;
+import com.eventsphere.eventsphere_backend.booking.entity.BookingStatus;
 import com.eventsphere.eventsphere_backend.booking.repository.BookingRepository;
-import com.eventsphere.eventsphere_backend.common.exception.EventHasBookingsException;
+import com.eventsphere.eventsphere_backend.common.exception.EventAlreadyCancelledException;
 import com.eventsphere.eventsphere_backend.common.exception.EventNotFoundException;
 import com.eventsphere.eventsphere_backend.common.exception.EventOwnershipException;
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
@@ -10,9 +12,14 @@ import com.eventsphere.eventsphere_backend.event.dto.EventResponse;
 import com.eventsphere.eventsphere_backend.event.dto.UpdateEventRequest;
 import com.eventsphere.eventsphere_backend.event.entity.Event;
 import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import com.eventsphere.eventsphere_backend.event.mapper.EventMapper;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
 import com.eventsphere.eventsphere_backend.event.specification.EventSpecification;
+import com.eventsphere.eventsphere_backend.notification.service.NotificationService;
+import com.eventsphere.eventsphere_backend.payment.entity.Payment;
+import com.eventsphere.eventsphere_backend.payment.entity.PaymentStatus;
+import com.eventsphere.eventsphere_backend.payment.repository.PaymentRepository;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
@@ -35,17 +42,23 @@ public class EventService {
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
+    private final PaymentRepository paymentRepository;
+    private final NotificationService notificationService;
     private final EventMapper eventMapper;
 
     public EventService(
             EventRepository eventRepository,
             UserRepository userRepository,
             BookingRepository bookingRepository,
+            PaymentRepository paymentRepository,
+            NotificationService notificationService,
             EventMapper eventMapper) {
 
         this.eventRepository = eventRepository;
         this.userRepository = userRepository;
         this.bookingRepository = bookingRepository;
+        this.paymentRepository = paymentRepository;
+        this.notificationService = notificationService;
         this.eventMapper = eventMapper;
     }
 
@@ -63,22 +76,26 @@ public class EventService {
 
         Event event = eventMapper.toEntity(request);
 
-        // Store the user who created the event
         event.setCreatedBy(organizer);
+        event.setStatus(EventStatus.ACTIVE);
 
-        Event savedEvent = eventRepository.save(event);
+        Event savedEvent =
+                eventRepository.save(event);
 
         return eventMapper.toResponse(savedEvent);
     }
 
     // =========================================================
-    // GET ALL EVENTS
+    // GET ALL ACTIVE EVENTS
     // =========================================================
 
     public List<EventResponse> getAllEvents() {
 
         return eventRepository.findAll()
                 .stream()
+                .filter(event ->
+                        event.getStatus() == EventStatus.ACTIVE
+                )
                 .map(eventMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -129,8 +146,11 @@ public class EventService {
                 .orElseThrow(() ->
                         new UserNotFoundException(email));
 
-        // Check whether the user is allowed to modify this event
         validateOwnership(event, user);
+
+        if (event.getStatus() == EventStatus.CANCELLED) {
+            throw new EventAlreadyCancelledException(id);
+        }
 
         event.setTitle(request.getTitle());
         event.setDescription(request.getDescription());
@@ -140,9 +160,117 @@ public class EventService {
         event.setTicketPrice(request.getTicketPrice());
         event.setCategory(request.getCategory());
 
-        Event updatedEvent = eventRepository.save(event);
+        Event updatedEvent =
+                eventRepository.save(event);
 
         return eventMapper.toResponse(updatedEvent);
+    }
+
+    // =========================================================
+    // CANCEL EVENT
+    // ORGANIZER ONLY - OWN EVENTS
+    // =========================================================
+
+    @Transactional
+    public EventResponse cancelEvent(
+            Long id,
+            String email) {
+
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() ->
+                        new EventNotFoundException(id));
+
+        User organizer = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(email));
+
+        validateOrganizerOwnership(event, organizer);
+
+        if (event.getStatus() == EventStatus.CANCELLED) {
+            throw new EventAlreadyCancelledException(id);
+        }
+
+        event.setStatus(EventStatus.CANCELLED);
+
+        List<Booking> bookings =
+                bookingRepository.findByEventOrderByCreatedAtDesc(
+                        event
+                );
+
+        for (Booking booking : bookings) {
+
+            if (booking.getBookingStatus()
+                    == BookingStatus.CANCELLED) {
+                continue;
+            }
+
+            if (booking.getBookingStatus()
+                    == BookingStatus.CONFIRMED) {
+
+                refundCustomerForCancelledEvent(booking);
+            }
+
+            booking.setBookingStatus(
+                    BookingStatus.CANCELLED
+            );
+
+            bookingRepository.save(booking);
+
+            notificationService.createNotification(
+                    booking.getUser().getId(),
+                    "Event Cancelled",
+                    "The event \""
+                            + event.getTitle()
+                            + "\" has been cancelled. "
+                            + "Your booking "
+                            + booking.getBookingReference()
+                            + " has also been cancelled."
+            );
+        }
+
+        Event savedEvent =
+                eventRepository.save(event);
+
+        return eventMapper.toResponse(savedEvent);
+    }
+
+    // =========================================================
+    // REFUND CUSTOMER
+    // =========================================================
+
+    private void refundCustomerForCancelledEvent(
+            Booking booking) {
+
+        Payment payment = paymentRepository
+                .findByBooking(booking)
+                .orElse(null);
+
+        if (payment == null) {
+            return;
+        }
+
+        if (payment.getPaymentStatus()
+                != PaymentStatus.SUCCESS) {
+            return;
+        }
+
+        payment.setPaymentStatus(
+                PaymentStatus.REFUNDED
+        );
+
+        payment.setPaymentDate(
+                LocalDateTime.now()
+        );
+
+        paymentRepository.save(payment);
+
+        notificationService.createNotification(
+                booking.getUser().getId(),
+                "Payment Refunded",
+                "Your payment for booking "
+                        + booking.getBookingReference()
+                        + " has been refunded because the event was cancelled."
+        );
     }
 
     // =========================================================
@@ -162,27 +290,21 @@ public class EventService {
                 .orElseThrow(() ->
                         new UserNotFoundException(email));
 
-        // Check ownership before checking whether deletion is allowed
         validateOwnership(event, user);
 
-        /*
-         * Do not physically delete an event that has bookings.
-         *
-         * Bookings represent historical transactions and may
-         * have associated payment records.
-         */
         if (bookingRepository.existsByEvent(event)) {
-            throw new EventHasBookingsException(id);
+            throw new com.eventsphere.eventsphere_backend.common.exception.EventHasBookingsException(id);
         }
 
         eventRepository.delete(event);
     }
 
     // =========================================================
-    // SEARCH EVENTS
+    // SEARCH ACTIVE EVENTS
     // =========================================================
 
-    public List<EventResponse> searchEvents(String keyword) {
+    public List<EventResponse> searchEvents(
+            String keyword) {
 
         return eventRepository
                 .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
@@ -190,6 +312,9 @@ public class EventService {
                         keyword
                 )
                 .stream()
+                .filter(event ->
+                        event.getStatus() == EventStatus.ACTIVE
+                )
                 .map(eventMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -203,6 +328,9 @@ public class EventService {
 
         return eventRepository.findByCategory(category)
                 .stream()
+                .filter(event ->
+                        event.getStatus() == EventStatus.ACTIVE
+                )
                 .map(eventMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -217,6 +345,9 @@ public class EventService {
         return eventRepository
                 .findByLocationContainingIgnoreCase(location)
                 .stream()
+                .filter(event ->
+                        event.getStatus() == EventStatus.ACTIVE
+                )
                 .map(eventMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -228,13 +359,18 @@ public class EventService {
     public List<EventResponse> getEventsByDate(
             LocalDate date) {
 
-        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime start =
+                date.atStartOfDay();
 
-        LocalDateTime end = date.atTime(LocalTime.MAX);
+        LocalDateTime end =
+                date.atTime(LocalTime.MAX);
 
         return eventRepository
                 .findByEventDateBetween(start, end)
                 .stream()
+                .filter(event ->
+                        event.getStatus() == EventStatus.ACTIVE
+                )
                 .map(eventMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -253,6 +389,9 @@ public class EventService {
                         maxPrice
                 )
                 .stream()
+                .filter(event ->
+                        event.getStatus() == EventStatus.ACTIVE
+                )
                 .map(eventMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -268,6 +407,9 @@ public class EventService {
                         LocalDateTime.now()
                 )
                 .stream()
+                .filter(event ->
+                        event.getStatus() == EventStatus.ACTIVE
+                )
                 .map(eventMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -279,8 +421,11 @@ public class EventService {
     public Page<EventResponse> getEvents(
             Pageable pageable) {
 
+        Specification<Event> specification =
+                EventSpecification.isActive();
+
         return eventRepository
-                .findAll(pageable)
+                .findAll(specification, pageable)
                 .map(eventMapper::toResponse);
     }
 
@@ -292,16 +437,35 @@ public class EventService {
             Event event,
             User user) {
 
-        // ADMIN can modify any event
         if (user.getRole() == Role.ADMIN) {
             return;
         }
 
-        // ORGANIZER can modify only their own events
-        if (event.getCreatedBy() == null ||
-                !event.getCreatedBy()
-                        .getId()
-                        .equals(user.getId())) {
+        if (event.getCreatedBy() == null
+                || !event.getCreatedBy()
+                .getId()
+                .equals(user.getId())) {
+
+            throw new EventOwnershipException();
+        }
+    }
+
+    // =========================================================
+    // ORGANIZER OWNERSHIP VALIDATION
+    // =========================================================
+
+    private void validateOrganizerOwnership(
+            Event event,
+            User organizer) {
+
+        if (organizer.getRole() != Role.ORGANIZER) {
+            throw new EventOwnershipException();
+        }
+
+        if (event.getCreatedBy() == null
+                || !event.getCreatedBy()
+                .getId()
+                .equals(organizer.getId())) {
 
             throw new EventOwnershipException();
         }
@@ -321,15 +485,31 @@ public class EventService {
             LocalDateTime endDate,
             Pageable pageable) {
 
-        Specification<Event> specification = Specification.allOf(
-                EventSpecification.keywordContains(keyword),
-                EventSpecification.hasCategory(category),
-                EventSpecification.hasLocation(location),
-                EventSpecification.priceGreaterThanOrEqual(minPrice),
-                EventSpecification.priceLessThanOrEqual(maxPrice),
-                EventSpecification.eventDateAfter(startDate),
-                EventSpecification.eventDateBefore(endDate)
-        );
+        Specification<Event> specification =
+                Specification.allOf(
+                        EventSpecification.keywordContains(
+                                keyword
+                        ),
+                        EventSpecification.hasCategory(
+                                category
+                        ),
+                        EventSpecification.hasLocation(
+                                location
+                        ),
+                        EventSpecification.priceGreaterThanOrEqual(
+                                minPrice
+                        ),
+                        EventSpecification.priceLessThanOrEqual(
+                                maxPrice
+                        ),
+                        EventSpecification.eventDateAfter(
+                                startDate
+                        ),
+                        EventSpecification.eventDateBefore(
+                                endDate
+                        ),
+                        EventSpecification.isActive()
+                );
 
         return eventRepository
                 .findAll(specification, pageable)

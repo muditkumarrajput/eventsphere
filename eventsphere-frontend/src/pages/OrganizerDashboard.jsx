@@ -9,6 +9,24 @@ function OrganizerDashboard() {
     const [error, setError] = useState("");
     const [insightsError, setInsightsError] = useState("");
 
+    const [cancellingEventId, setCancellingEventId] = useState(null);
+    const [cancelError, setCancelError] = useState("");
+
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [creatingEvent, setCreatingEvent] = useState(false);
+    const [createError, setCreateError] = useState("");
+    const [createSuccess, setCreateSuccess] = useState("");
+
+    const [eventForm, setEventForm] = useState({
+        title: "",
+        description: "",
+        location: "",
+        eventDate: "",
+        capacity: "",
+        ticketPrice: "",
+        category: "WORKSHOP",
+    });
+
     useEffect(() => {
         const fetchDashboardData = async () => {
             setLoading(true);
@@ -54,56 +72,163 @@ function OrganizerDashboard() {
         fetchDashboardData();
     }, []);
 
-    if (loading) {
-        return (
-            <div className="dashboard-page">
+    const handleFormChange = (event) => {
+        const { name, value } = event.target;
 
-                <div className="dashboard-header">
+        setEventForm((currentForm) => ({
+            ...currentForm,
+            [name]: value,
+        }));
+    };
 
-                    <div>
+    const handleCreateEvent = async (event) => {
+        event.preventDefault();
 
-                        <h1>
-                            Organizer Dashboard
-                        </h1>
+        setCreatingEvent(true);
+        setCreateError("");
+        setCreateSuccess("");
 
-                        <p>
-                            Overview of your events,
-                            bookings, tickets, and revenue.
-                        </p>
+        try {
+            const response = await api.post(
+                "/events",
+                {
+                    title: eventForm.title,
+                    description: eventForm.description,
+                    location: eventForm.location,
+                    eventDate: eventForm.eventDate,
+                    capacity: Number(eventForm.capacity),
+                    ticketPrice: eventForm.ticketPrice,
+                    category: eventForm.category,
+                }
+            );
 
-                    </div>
+            setEventForm({
+                title: "",
+                description: "",
+                location: "",
+                eventDate: "",
+                capacity: "",
+                ticketPrice: "",
+                category: "WORKSHOP",
+            });
 
-                </div>
+            setCreateSuccess(
+                `Event "${response.data.title}" created successfully.`
+            );
 
-                <p className="dashboard-message">
-                    Loading dashboard...
-                </p>
+            setShowCreateForm(false);
 
-            </div>
+            const [
+                dashboardResponse,
+                insightsResponse,
+            ] = await Promise.all([
+                api.get("/dashboard"),
+                api.get("/dashboard/events"),
+            ]);
+
+            setDashboard(
+                dashboardResponse.data
+            );
+
+            setEventInsights(
+                insightsResponse.data
+            );
+        } catch (error) {
+            console.error(
+                "Failed to create event:",
+                error
+            );
+
+            if (error.response?.data?.message) {
+                setCreateError(
+                    error.response.data.message
+                );
+            } else if (
+                error.response?.data
+            ) {
+                setCreateError(
+                    "Please check the event details and try again."
+                );
+            } else {
+                setCreateError(
+                    "Failed to create event."
+                );
+            }
+        } finally {
+            setCreatingEvent(false);
+        }
+    };
+
+    const handleCancelEvent = async (eventId) => {
+        const confirmed = window.confirm(
+            "Are you sure you want to cancel this event? All active bookings for this event will also be cancelled."
         );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setCancellingEventId(eventId);
+        setCancelError("");
+
+        try {
+            await api.patch(
+                `/events/${eventId}/cancel`
+);
+
+setEventInsights((currentEvents) =>
+    currentEvents.map((event) =>
+        event.eventId === eventId
+            ? {
+                ...event,
+                status: "CANCELLED",
+            }
+            : event
+    )
+);
+
+setDashboard((currentDashboard) => {
+    if (!currentDashboard) {
+        return currentDashboard;
     }
 
-    if (error || !dashboard) {
-        return (
-            <div className="dashboard-page">
+    return {
+        ...currentDashboard,
+        totalEvents:
+            Math.max(
+                currentDashboard.totalEvents - 1,
+                0
+            ),
+        upcomingEvents:
+            Math.max(
+                currentDashboard.upcomingEvents - 1,
+                0
+            ),
+    };
+});
+} catch (error) {
+    console.error(
+        "Failed to cancel event:",
+        error
+    );
 
-                <h1>
-                    Organizer Dashboard
-                </h1>
-
-                <p className="favorites-error">
-                    {error ||
-                        "Dashboard data not available."}
-                </p>
-
-            </div>
+    if (error.response?.data?.message) {
+        setCancelError(
+            error.response.data.message
+        );
+    } else {
+        setCancelError(
+            "Failed to cancel event."
         );
     }
+} finally {
+    setCancellingEventId(null);
+}
+};
 
+if (loading) {
     return (
         <div className="dashboard-page">
-
-            {/* Dashboard Header */}
 
             <div className="dashboard-header">
 
@@ -122,256 +247,583 @@ function OrganizerDashboard() {
 
             </div>
 
-            {/* Summary Cards */}
+            <p className="dashboard-message">
+                Loading dashboard...
+            </p>
 
-            <div className="dashboard-summary-grid">
+        </div>
+    );
+}
 
-                <div className="dashboard-card">
+if (error || !dashboard) {
+    return (
+        <div className="dashboard-page">
 
-                    <span>
-                        Total Events
-                    </span>
+            <h1>
+                Organizer Dashboard
+            </h1>
 
-                    <strong>
-                        {dashboard.totalEvents}
-                    </strong>
+            <p className="favorites-error">
+                {error ||
+                    "Dashboard data not available."}
+            </p>
 
-                </div>
+        </div>
+    );
+}
 
-                <div className="dashboard-card">
+return (
+    <div className="dashboard-page">
 
-                    <span>
-                        Upcoming Events
-                    </span>
+        <div className="dashboard-header">
 
-                    <strong>
-                        {dashboard.upcomingEvents}
-                    </strong>
+            <div>
 
-                </div>
+                <h1>
+                    Organizer Dashboard
+                </h1>
 
-                <div className="dashboard-card">
-
-                    <span>
-                        Completed Events
-                    </span>
-
-                    <strong>
-                        {dashboard.completedEvents}
-                    </strong>
-
-                </div>
-
-                <div className="dashboard-card">
-
-                    <span>
-                        Total Bookings
-                    </span>
-
-                    <strong>
-                        {dashboard.totalBookings}
-                    </strong>
-
-                </div>
-
-                <div className="dashboard-card">
-
-                    <span>
-                        Tickets Sold
-                    </span>
-
-                    <strong>
-                        {dashboard.ticketsSold}
-                    </strong>
-
-                </div>
-
-                <div className="dashboard-card revenue-card">
-
-                    <span>
-                        Total Revenue
-                    </span>
-
-                    <strong>
-                        ₹{dashboard.totalRevenue}
-                    </strong>
-
-                </div>
+                <p>
+                    Overview of your events,
+                    bookings, tickets, and revenue.
+                </p>
 
             </div>
 
-            {/* Event Insights */}
+            <button
+                className="create-event-button"
+                onClick={() => {
+                    setShowCreateForm(
+                        (current) => !current
+                    );
+                    setCreateError("");
+                    setCreateSuccess("");
+                }}
+            >
+                {showCreateForm
+                    ? "Close Form"
+                    : "Create Event"}
+            </button>
 
-            <div className="dashboard-insights">
+        </div>
+
+        {createSuccess && (
+            <p className="success-message">
+                {createSuccess}
+            </p>
+        )}
+
+        {createError && (
+            <p className="favorites-error">
+                {createError}
+            </p>
+        )}
+
+        {cancelError && (
+            <p className="favorites-error">
+                {cancelError}
+            </p>
+        )}
+
+        {showCreateForm && (
+            <div className="create-event-card">
 
                 <div className="dashboard-section-header">
 
                     <div>
 
                         <h2>
-                            Event Insights
+                            Create New Event
                         </h2>
 
                         <p>
-                            Performance of your individual
-                            events.
+                            Add a new event to your
+                            EventSphere organizer account.
                         </p>
 
                     </div>
 
                 </div>
 
-                {insightsError && (
-                    <p className="favorites-error">
-                        {insightsError}
-                    </p>
-                )}
+                <form
+                    className="create-event-form"
+                    onSubmit={handleCreateEvent}
+                >
 
-                {eventInsights.length === 0 ? (
-                    <div className="empty-dashboard">
+                    <div className="form-group">
 
-                        <h3>
-                            No event insights available
-                        </h3>
+                        <label htmlFor="title">
+                            Event Title
+                        </label>
 
-                        <p>
-                            You don't have any event
-                            analytics yet.
-                        </p>
+                        <input
+                            id="title"
+                            name="title"
+                            type="text"
+                            value={eventForm.title}
+                            onChange={handleFormChange}
+                            placeholder="Enter event title"
+                            maxLength={255}
+                            required
+                        />
 
                     </div>
-                ) : (
-                    <div className="insights-grid">
 
-                        {eventInsights.map((event) => {
+                    <div className="form-group">
 
-                            const occupancy =
-                                Math.min(
-                                    Math.max(
-                                        Number(
-                                            event.occupancyPercentage
-                                        ) || 0,
-                                        0
-                                    ),
-                                    100
-                                );
+                        <label htmlFor="description">
+                            Description
+                        </label>
 
-                            return (
-                                <div
-                                    className="insight-card"
-                                    key={event.eventId}
-                                >
+                        <textarea
+                            id="description"
+                            name="description"
+                            value={
+                                eventForm.description
+                            }
+                            onChange={handleFormChange}
+                            placeholder="Describe your event"
+                            maxLength={2000}
+                            rows="5"
+                            required
+                        />
 
-                                    <div className="insight-card-header">
+                    </div>
 
-                                        <h3>
-                                            {event.title}
-                                        </h3>
+                    <div className="form-group">
 
-                                    </div>
+                        <label htmlFor="location">
+                            Location
+                        </label>
 
-                                    <div className="insight-info">
+                        <input
+                            id="location"
+                            name="location"
+                            type="text"
+                            value={eventForm.location}
+                            onChange={handleFormChange}
+                            placeholder="Enter event location"
+                            maxLength={255}
+                            required
+                        />
 
-                                        <div>
+                    </div>
+
+                    <div className="form-group">
+
+                        <label htmlFor="eventDate">
+                            Event Date & Time
+                        </label>
+
+                        <input
+                            id="eventDate"
+                            name="eventDate"
+                            type="datetime-local"
+                            value={eventForm.eventDate}
+                            onChange={handleFormChange}
+                            required
+                        />
+
+                    </div>
+
+                    <div className="create-event-form-row">
+
+                        <div className="form-group">
+
+                            <label htmlFor="capacity">
+                                Capacity
+                            </label>
+
+                            <input
+                                id="capacity"
+                                name="capacity"
+                                type="number"
+                                value={eventForm.capacity}
+                                onChange={handleFormChange}
+                                placeholder="50"
+                                min="1"
+                                required
+                            />
+
+                        </div>
+
+                        <div className="form-group">
+
+                            <label htmlFor="ticketPrice">
+                                Ticket Price
+                            </label>
+
+                            <input
+                                id="ticketPrice"
+                                name="ticketPrice"
+                                type="number"
+                                value={eventForm.ticketPrice}
+                                onChange={handleFormChange}
+                                placeholder="999"
+                                min="0"
+                                step="0.01"
+                                required
+                            />
+
+                        </div>
+
+                    </div>
+
+                    <div className="form-group">
+
+                        <label htmlFor="category">
+                            Category
+                        </label>
+
+                        <select
+                            id="category"
+                            name="category"
+                            value={eventForm.category}
+                            onChange={handleFormChange}
+                            required
+                        >
+
+                            <option value="CONFERENCE">
+                                Conference
+                            </option>
+
+                            <option value="WORKSHOP">
+                                Workshop
+                            </option>
+
+                            <option value="SEMINAR">
+                                Seminar
+                            </option>
+
+                            <option value="MEETUP">
+                                Meetup
+                            </option>
+
+                            <option value="WEBINAR">
+                                Webinar
+                            </option>
+
+                            <option value="CONCERT">
+                                Concert
+                            </option>
+
+                            <option value="SPORTS">
+                                Sports
+                            </option>
+
+                            <option value="CULTURAL">
+                                Cultural
+                            </option>
+
+                            <option value="FESTIVAL">
+                                Festival
+                            </option>
+
+                            <option value="OTHER">
+                                Other
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="submit-create-event-button"
+                        disabled={creatingEvent}
+                    >
+                        {creatingEvent
+                            ? "Creating Event..."
+                            : "Create Event"}
+                    </button>
+
+                </form>
+
+            </div>
+        )}
+
+        <div className="dashboard-summary-grid">
+
+            <div className="dashboard-card">
+
+                    <span>
+                        Total Events
+                    </span>
+
+                <strong>
+                    {dashboard.totalEvents}
+                </strong>
+
+            </div>
+
+            <div className="dashboard-card">
+
+                    <span>
+                        Upcoming Events
+                    </span>
+
+                <strong>
+                    {dashboard.upcomingEvents}
+                </strong>
+
+            </div>
+
+            <div className="dashboard-card">
+
+                    <span>
+                        Completed Events
+                    </span>
+
+                <strong>
+                    {dashboard.completedEvents}
+                </strong>
+
+            </div>
+
+            <div className="dashboard-card">
+
+                    <span>
+                        Total Bookings
+                    </span>
+
+                <strong>
+                    {dashboard.totalBookings}
+                </strong>
+
+            </div>
+
+            <div className="dashboard-card">
+
+                    <span>
+                        Tickets Sold
+                    </span>
+
+                <strong>
+                    {dashboard.ticketsSold}
+                </strong>
+
+            </div>
+
+            <div className="dashboard-card revenue-card">
+
+                    <span>
+                        Total Revenue
+                    </span>
+
+                <strong>
+                    ₹{dashboard.totalRevenue}
+                </strong>
+
+            </div>
+
+        </div>
+
+        <div className="dashboard-insights">
+
+            <div className="dashboard-section-header">
+
+                <div>
+
+                    <h2>
+                        Event Insights
+                    </h2>
+
+                    <p>
+                        Performance of your individual
+                        events.
+                    </p>
+
+                </div>
+
+            </div>
+
+            {insightsError && (
+                <p className="favorites-error">
+                    {insightsError}
+                </p>
+            )}
+
+            {eventInsights.length === 0 ? (
+                <div className="empty-dashboard">
+
+                    <h3>
+                        No event insights available
+                    </h3>
+
+                    <p>
+                        You don't have any event
+                        analytics yet.
+                    </p>
+
+                </div>
+            ) : (
+                <div className="insights-grid">
+
+                    {eventInsights.map((event) => {
+
+                        const occupancy =
+                            Math.min(
+                                Math.max(
+                                    Number(
+                                        event.occupancyPercentage
+                                    ) || 0,
+                                    0
+                                ),
+                                100
+                            );
+
+                        const isCancelled =
+                            event.status === "CANCELLED";
+
+                        const isCancelling =
+                            cancellingEventId ===
+                            event.eventId;
+
+                        return (
+                            <div
+                                className="insight-card"
+                                key={event.eventId}
+                            >
+
+                                <div className="insight-card-header">
+
+                                    <h3>
+                                        {event.title}
+                                    </h3>
+
+                                    <span
+                                        className={`event-status ${
+                                            isCancelled
+                                                ? "cancelled"
+                                                : "active"
+                                        }`}
+                                    >
+                                            {event.status ||
+                                                "ACTIVE"}
+                                        </span>
+
+                                </div>
+
+                                <div className="insight-info">
+
+                                    <div>
 
                                             <span>
                                                 Capacity
                                             </span>
 
-                                            <strong>
-                                                {event.capacity}
-                                            </strong>
+                                        <strong>
+                                            {event.capacity}
+                                        </strong>
 
-                                        </div>
+                                    </div>
 
-                                        <div>
+                                    <div>
 
                                             <span>
                                                 Tickets Sold
                                             </span>
 
-                                            <strong>
-                                                {event.ticketsSold}
-                                            </strong>
+                                        <strong>
+                                            {event.ticketsSold}
+                                        </strong>
 
-                                        </div>
+                                    </div>
 
-                                        <div>
+                                    <div>
 
                                             <span>
                                                 Remaining Seats
                                             </span>
 
-                                            <strong>
-                                                {event.remainingSeats}
-                                            </strong>
+                                        <strong>
+                                            {event.remainingSeats}
+                                        </strong>
 
-                                        </div>
+                                    </div>
 
-                                        <div>
+                                    <div>
 
                                             <span>
                                                 Occupancy
                                             </span>
 
-                                            <strong>
-                                                {event.occupancyPercentage}%
-                                            </strong>
+                                        <strong>
+                                            {event.occupancyPercentage}%
+                                        </strong>
 
-                                        </div>
+                                    </div>
 
-                                        <div>
+                                    <div>
 
                                             <span>
                                                 Revenue
                                             </span>
 
-                                            <strong>
-                                                ₹{event.revenue}
-                                            </strong>
-
-                                        </div>
+                                        <strong>
+                                            ₹{event.revenue}
+                                        </strong>
 
                                     </div>
 
-                                    <div className="occupancy-section">
+                                </div>
 
-                                        <div className="occupancy-header">
+                                <div className="occupancy-section">
+
+                                    <div className="occupancy-header">
 
                                             <span>
                                                 Occupancy
                                             </span>
 
-                                            <strong>
-                                                {event.occupancyPercentage}%
-                                            </strong>
+                                        <strong>
+                                            {event.occupancyPercentage}%
+                                        </strong>
 
-                                        </div>
+                                    </div>
 
-                                        <div className="occupancy-bar">
+                                    <div className="occupancy-bar">
 
-                                            <div
-                                                className="occupancy-progress"
-                                                style={{
-                                                    width: `${occupancy}%`,
-                                                }}
-                                            />
-
-                                        </div>
+                                        <div
+                                            className="occupancy-progress"
+                                            style={{
+                                                width: `${occupancy}%`,
+                                            }}
+                                        />
 
                                     </div>
 
                                 </div>
-                            );
-                        })}
 
-                    </div>
-                )}
+                                {!isCancelled && (
+                                    <button
+                                        className="cancel-event-button"
+                                        onClick={() =>
+                                            handleCancelEvent(
+                                                event.eventId
+                                            )
+                                        }
+                                        disabled={
+                                            isCancelling
+                                        }
+                                    >
+                                        {isCancelling
+                                            ? "Cancelling..."
+                                            : "Cancel Event"}
+                                    </button>
+                                )}
 
-            </div>
+                            </div>
+                        );
+                    })}
+
+                </div>
+            )}
 
         </div>
-    );
+
+    </div>
+);
 }
 
 export default OrganizerDashboard;

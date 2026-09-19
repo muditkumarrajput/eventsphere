@@ -13,7 +13,9 @@ import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
-    Optional<Booking> findByBookingReference(String bookingReference);
+    Optional<Booking> findByBookingReference(
+            String bookingReference
+    );
 
     @Query("""
             SELECT COALESCE(SUM(b.numberOfTickets), 0)
@@ -21,11 +23,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             WHERE b.event.id = :eventId
             AND b.bookingStatus = 'CONFIRMED'
             """)
-    Integer getBookedTickets(@Param("eventId") Long eventId);
+    Integer getBookedTickets(
+            @Param("eventId") Long eventId
+    );
 
     List<Booking> findAllByOrderByCreatedAtDesc();
 
-    List<Booking> findByUserOrderByCreatedAtDesc(User user);
+    List<Booking> findByUserOrderByCreatedAtDesc(
+            User user
+    );
+
+    List<Booking> findByEventOrderByCreatedAtDesc(
+            Event event
+    );
 
     // Check whether user has at least one confirmed booking for an event
     boolean existsByUserAndEventAndBookingStatus(

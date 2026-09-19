@@ -1,5 +1,6 @@
 package com.eventsphere.eventsphere_backend.dashboard.dto;
 
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -16,6 +17,8 @@ public class EventInsightResponse {
     private String title;
 
     private Integer capacity;
+
+    private EventStatus status;
 
     private Long ticketsSold;
 

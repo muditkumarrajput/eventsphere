@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 function Login() {
     const [email, setEmail] = useState("");
@@ -10,7 +10,6 @@ function Login() {
     const [loading, setLoading] = useState(false);
 
     const navigate = useNavigate();
-    const location = useLocation();
     const { login } = useAuth();
 
     const handleLogin = async (event) => {
@@ -32,10 +31,7 @@ function Login() {
 
             login(token);
 
-            const redirectPath =
-                location.state?.from?.pathname || "/events";
-
-            navigate(redirectPath, { replace: true });
+            navigate("/", { replace: true });
 
         } catch (error) {
             console.error(

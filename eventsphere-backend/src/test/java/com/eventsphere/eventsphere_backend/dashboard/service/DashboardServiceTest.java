@@ -4,6 +4,7 @@ import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundExceptio
 import com.eventsphere.eventsphere_backend.dashboard.dto.EventInsightResponse;
 import com.eventsphere.eventsphere_backend.dashboard.dto.OrganizerDashboardResponse;
 import com.eventsphere.eventsphere_backend.dashboard.repository.DashboardRepository;
+import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -121,6 +122,7 @@ class DashboardServiceTest {
                 8L,
                 "Java Backend Workshop",
                 100,
+                EventStatus.ACTIVE,
                 20L,
                 80,
                 20.0,
@@ -155,6 +157,11 @@ class DashboardServiceTest {
         );
 
         assertEquals(
+                EventStatus.ACTIVE,
+                insight.getStatus()
+        );
+
+        assertEquals(
                 20L,
                 insight.getTicketsSold()
         );
@@ -177,6 +184,7 @@ class DashboardServiceTest {
         verify(dashboardRepository)
                 .getEventInsights(organizer);
     }
+
 
     @Test
     void shouldThrowExceptionWhenUserDoesNotExistForDashboard() {
