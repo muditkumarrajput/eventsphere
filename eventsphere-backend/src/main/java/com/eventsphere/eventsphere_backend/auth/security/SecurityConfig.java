@@ -90,8 +90,6 @@ public class SecurityConfig {
 
                         // -------------------------------------------------
                         // Swagger / OpenAPI
-                        // These endpoints must be public so Swagger UI
-                        // itself can load without a JWT.
                         // -------------------------------------------------
                         .requestMatchers(
                                 "/swagger-ui/**",
@@ -116,8 +114,6 @@ public class SecurityConfig {
 
                         // -------------------------------------------------
                         // Public Actuator Health Endpoint
-                        // Used by deployment platforms and monitoring tools
-                        // to check whether the application is healthy.
                         // -------------------------------------------------
                         .requestMatchers(
                                 "/actuator/health"
@@ -162,7 +158,10 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                List.of("http://localhost:5173")
+                List.of(
+                        "http://localhost:5173",
+                        "https://eventsphere-frontend-five.vercel.app"
+                )
         );
 
         configuration.setAllowedMethods(
