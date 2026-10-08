@@ -115,8 +115,15 @@ public class SecurityConfig {
                         // -------------------------------------------------
                         // Public Actuator Health Endpoint
                         // -------------------------------------------------
+                        //                        .requestMatchers(
+                        //                                "/actuator/health"
+                        //                        ).permitAll()
+
+                        // -------------------------------------------------
+                        // Development-only Email Testing
+                        // -------------------------------------------------
                         .requestMatchers(
-                                "/actuator/health"
+                                "/api/dev/**"
                         ).permitAll()
 
                         // -------------------------------------------------

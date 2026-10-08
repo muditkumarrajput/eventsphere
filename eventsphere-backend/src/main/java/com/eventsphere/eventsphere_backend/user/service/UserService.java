@@ -1,8 +1,10 @@
 package com.eventsphere.eventsphere_backend.user.service;
+import java.util.Objects;
 
 import com.eventsphere.eventsphere_backend.common.exception.UserEmailAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.common.exception.UserHasEventsException;
 import com.eventsphere.eventsphere_backend.common.exception.UserNotFoundException;
+import com.eventsphere.eventsphere_backend.common.exception.UserPhoneAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.event.repository.EventRepository;
 import com.eventsphere.eventsphere_backend.user.dto.ChangeUserRoleRequest;
 import com.eventsphere.eventsphere_backend.user.dto.UpdateUserRequest;
@@ -91,6 +93,14 @@ public class UserService {
         User existingUser = userRepository.findByEmail(email)
                 .orElseThrow(() ->
                         new UserNotFoundException(email));
+
+        if (!Objects.equals(existingUser.getPhoneNumber(), request.getPhoneNumber())
+                && userRepository.existsByPhoneNumber(request.getPhoneNumber())) {
+
+            throw new UserPhoneAlreadyExistsException(
+                    request.getPhoneNumber()
+            );
+        }
 
         /*
          * Check whether the requested email is already

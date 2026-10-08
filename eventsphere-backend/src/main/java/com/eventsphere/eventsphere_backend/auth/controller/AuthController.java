@@ -1,89 +1,116 @@
 package com.eventsphere.eventsphere_backend.auth.controller;
 
 import com.eventsphere.eventsphere_backend.auth.dto.AuthResponse;
+import com.eventsphere.eventsphere_backend.auth.dto.LoginOtpResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.LoginRequest;
+import com.eventsphere.eventsphere_backend.auth.dto.PendingRegistrationResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterResponse;
+import com.eventsphere.eventsphere_backend.auth.dto.VerifyOtpRequest;
+import com.eventsphere.eventsphere_backend.auth.dto.VerifyOtpResponse;
 import com.eventsphere.eventsphere_backend.auth.service.AuthService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirements;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.eventsphere.eventsphere_backend.auth.dto.ForgotPasswordOtpResponse;
+import com.eventsphere.eventsphere_backend.auth.dto.ForgotPasswordRequest;
+import com.eventsphere.eventsphere_backend.auth.dto.ResetPasswordRequest;
+import com.eventsphere.eventsphere_backend.auth.dto.ChangePasswordRequest;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/api/auth")
-@Tag(
-        name = "Authentication",
-        description = "APIs for user registration and login"
-)
 public class AuthController {
 
     private final AuthService authService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(
+            AuthService authService) {
         this.authService = authService;
     }
 
-    // =========================================================
-    // REGISTER
-    // =========================================================
-
     @PostMapping("/register")
-    @Operation(
-            summary = "Register a new user",
-            description = "Creates a new EventSphere user account"
-    )
-    @SecurityRequirements
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "User registered successfully"
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid registration data"
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Email already exists"
-            )
-    })
-    public RegisterResponse register(
+    public ResponseEntity<PendingRegistrationResponse> register(
             @Valid @RequestBody RegisterRequest request) {
 
-        return authService.register(request);
+        return ResponseEntity.ok(
+                authService.register(request)
+        );
     }
 
-    // =========================================================
-    // LOGIN
-    // =========================================================
+    @PostMapping("/register/verify-mobile")
+    public ResponseEntity<VerifyOtpResponse> verifyMobileOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        return ResponseEntity.ok(
+                authService.verifyMobileRegistrationOtp(
+                        request.getTarget(),
+                        request.getOtp()
+                )
+        );
+    }
+
+    @PostMapping("/register/verify-email")
+    public ResponseEntity<RegisterResponse> verifyEmailOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        return ResponseEntity.ok(
+                authService.verifyEmailRegistrationOtp(
+                        request.getTarget(),
+                        request.getOtp()
+                )
+        );
+    }
 
     @PostMapping("/login")
-    @Operation(
-            summary = "Login user",
-            description = "Authenticates a user and returns a JWT token"
-    )
-    @SecurityRequirements
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Login successful"
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid login request"
-            ),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Invalid email or password"
-            )
-    })
-    public AuthResponse login(
+    public ResponseEntity<LoginOtpResponse> login(
             @Valid @RequestBody LoginRequest request) {
 
-        return authService.login(request);
+        return ResponseEntity.ok(
+                authService.login(request)
+        );
+    }
+
+    @PostMapping("/login/verify-otp")
+    public ResponseEntity<AuthResponse> verifyLoginOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        return ResponseEntity.ok(
+                authService.verifyLoginOtp(
+                        request.getTarget(),
+                        request.getOtp()
+                )
+        );
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ForgotPasswordOtpResponse> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        return ResponseEntity.ok(
+                authService.forgotPassword(request)
+        );
+    }
+
+    @PostMapping("/forgot-password/reset")
+    public ResponseEntity<Void> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        authService.resetPassword(request);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
+
+        authService.changePassword(
+                authentication.getName(),
+                request
+        );
+
+        return ResponseEntity.noContent().build();
     }
 }

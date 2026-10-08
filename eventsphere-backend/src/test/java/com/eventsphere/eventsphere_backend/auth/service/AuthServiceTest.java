@@ -1,12 +1,18 @@
 package com.eventsphere.eventsphere_backend.auth.service;
 
-import com.eventsphere.eventsphere_backend.auth.dto.AuthResponse;
+import com.eventsphere.eventsphere_backend.auth.dto.LoginOtpResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.LoginRequest;
+import com.eventsphere.eventsphere_backend.auth.dto.PendingRegistrationResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterResponse;
+import com.eventsphere.eventsphere_backend.auth.dto.VerifyOtpResponse;
+import com.eventsphere.eventsphere_backend.auth.entity.PendingRegistration;
+import com.eventsphere.eventsphere_backend.auth.repository.PendingRegistrationRepository;
 import com.eventsphere.eventsphere_backend.auth.security.JwtService;
 import com.eventsphere.eventsphere_backend.common.exception.InvalidCredentialsException;
+import com.eventsphere.eventsphere_backend.common.exception.PasswordMismatchException;
 import com.eventsphere.eventsphere_backend.common.exception.UserEmailAlreadyExistsException;
+import com.eventsphere.eventsphere_backend.common.exception.UserPhoneAlreadyExistsException;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
@@ -21,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,95 +37,148 @@ class AuthServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private PendingRegistrationRepository pendingRegistrationRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
     private JwtService jwtService;
 
+    @Mock
+    private RegistrationOtpService registrationOtpService;
+
+    @Mock
+    private LoginOtpService loginOtpService;
+
     @InjectMocks
     private AuthService authService;
 
-
-    // =========================================================
-    // REGISTER
-    // =========================================================
-
     @Test
-    void shouldRegisterUser() {
+    void shouldStartRegistrationSuccessfully() {
 
         RegisterRequest request = RegisterRequest.builder()
                 .name("John")
                 .email("john@test.com")
                 .password("password123")
+                .confirmPassword("password123")
                 .phoneNumber("9876543210")
-                .build();
-
-        LocalDateTime createdAt = LocalDateTime.now();
-
-        User savedUser = User.builder()
-                .id(1L)
-                .name("John")
-                .email("john@test.com")
-                .password("encoded-password")
-                .phoneNumber("9876543210")
-                .role(Role.USER)
-                .createdAt(createdAt)
                 .build();
 
         when(userRepository.existsByEmail("john@test.com"))
                 .thenReturn(false);
 
+        when(
+                pendingRegistrationRepository
+                        .existsByEmail("john@test.com")
+        ).thenReturn(false);
+
+        when(userRepository.existsByPhoneNumber("9876543210"))
+                .thenReturn(false);
+
+        when(
+                pendingRegistrationRepository
+                        .existsByPhoneNumber("9876543210")
+        ).thenReturn(false);
+
         when(passwordEncoder.encode("password123"))
-                .thenReturn("encoded-password");
+                .thenReturn("hashed-password");
 
-        when(userRepository.save(any(User.class)))
-                .thenReturn(savedUser);
+        PendingRegistration savedRegistration =
+                PendingRegistration.builder()
+                        .id(1L)
+                        .name("John")
+                        .email("john@test.com")
+                        .phoneNumber("9876543210")
+                        .password("hashed-password")
+                        .mobileVerified(false)
+                        .emailVerified(false)
+                        .expiresAt(
+                                LocalDateTime.now()
+                                        .plusMinutes(10)
+                        )
+                        .createdAt(LocalDateTime.now())
+                        .build();
 
-        RegisterResponse result =
+        when(
+                pendingRegistrationRepository.save(
+                        any(PendingRegistration.class)
+                )
+        ).thenReturn(savedRegistration);
+
+        PendingRegistrationResponse expectedResponse =
+                PendingRegistrationResponse.builder()
+                        .message(
+                                "Mobile OTP sent successfully"
+                        )
+                        .mobileOtpSent(true)
+                        .emailOtpSent(false)
+                        .build();
+
+        when(
+                registrationOtpService
+                        .sendRegistrationOtp(
+                                savedRegistration
+                        )
+        ).thenReturn(expectedResponse);
+
+        PendingRegistrationResponse response =
                 authService.register(request);
 
-        assertNotNull(result);
+        assertNotNull(response);
 
         assertEquals(
-                1L,
-                result.getId()
+                "Mobile OTP sent successfully",
+                response.getMessage()
         );
 
-        assertEquals(
-                "John",
-                result.getName()
-        );
-
-        assertEquals(
-                "john@test.com",
-                result.getEmail()
-        );
-
-        assertEquals(
-                "9876543210",
-                result.getPhoneNumber()
-        );
-
-        assertEquals(
-                Role.USER,
-                result.getRole()
-        );
-
-        assertEquals(
-                createdAt,
-                result.getCreatedAt()
-        );
-
-        verify(userRepository)
-                .existsByEmail("john@test.com");
+        assertTrue(response.isMobileOtpSent());
+        assertFalse(response.isEmailOtpSent());
 
         verify(passwordEncoder)
                 .encode("password123");
 
-        verify(userRepository)
+        verify(pendingRegistrationRepository)
+                .save(any(PendingRegistration.class));
+
+        verify(registrationOtpService)
+                .sendRegistrationOtp(
+                        savedRegistration
+                );
+
+        verify(userRepository, never())
                 .save(any(User.class));
     }
 
+    @Test
+    void shouldRejectRegistrationWhenPasswordsDoNotMatch() {
+
+        RegisterRequest request = RegisterRequest.builder()
+                .name("John")
+                .email("john@test.com")
+                .password("password123")
+                .confirmPassword("different123")
+                .phoneNumber("9876543210")
+                .build();
+
+        PasswordMismatchException exception =
+                assertThrows(
+                        PasswordMismatchException.class,
+                        () -> authService.register(request)
+                );
+
+        assertEquals(
+                "Password and confirm password do not match",
+                exception.getMessage()
+        );
+
+        verifyNoInteractions(
+                userRepository,
+                pendingRegistrationRepository,
+                passwordEncoder,
+                registrationOtpService
+        );
+    }
 
     @Test
     void shouldRejectRegistrationWhenEmailAlreadyExists() {
@@ -127,6 +187,7 @@ class AuthServiceTest {
                 .name("John")
                 .email("john@test.com")
                 .password("password123")
+                .confirmPassword("password123")
                 .phoneNumber("9876543210")
                 .build();
 
@@ -147,163 +208,307 @@ class AuthServiceTest {
         verify(userRepository)
                 .existsByEmail("john@test.com");
 
-        verify(
+        verifyNoInteractions(
+                pendingRegistrationRepository,
                 passwordEncoder,
-                never()
-        ).encode(anyString());
-
-        verify(
-                userRepository,
-                never()
-        ).save(any(User.class));
-    }
-
-
-    // =========================================================
-    // LOGIN
-    // =========================================================
-
-    @Test
-    void shouldLoginUser() {
-
-        String email = "john@test.com";
-        String password = "password123";
-        String encodedPassword = "encoded-password";
-        String token = "jwt-token";
-
-        LoginRequest request = LoginRequest.builder()
-                .email(email)
-                .password(password)
-                .build();
-
-        User user = User.builder()
-                .id(1L)
-                .email(email)
-                .password(encodedPassword)
-                .role(Role.USER)
-                .build();
-
-        when(userRepository.findByEmail(email))
-                .thenReturn(Optional.of(user));
-
-        when(passwordEncoder.matches(
-                password,
-                encodedPassword
-        )).thenReturn(true);
-
-        when(jwtService.generateToken(
-                email,
-                Role.USER
-        )).thenReturn(token);
-
-        AuthResponse result =
-                authService.login(request);
-
-        assertNotNull(result);
-
-        assertEquals(
-                token,
-                result.getToken()
+                registrationOtpService
         );
-
-        verify(userRepository)
-                .findByEmail(email);
-
-        verify(passwordEncoder)
-                .matches(
-                        password,
-                        encodedPassword
-                );
-
-        verify(jwtService)
-                .generateToken(
-                        email,
-                        Role.USER
-                );
     }
 
-
     @Test
-    void shouldRejectLoginWhenEmailDoesNotExist() {
+    void shouldRejectRegistrationWhenPhoneAlreadyExists() {
 
-        String email = "unknown@test.com";
-
-        LoginRequest request = LoginRequest.builder()
-                .email(email)
+        RegisterRequest request = RegisterRequest.builder()
+                .name("John")
+                .email("john@test.com")
                 .password("password123")
+                .confirmPassword("password123")
+                .phoneNumber("9876543210")
                 .build();
 
-        when(userRepository.findByEmail(email))
-                .thenReturn(Optional.empty());
+        when(userRepository.existsByEmail("john@test.com"))
+                .thenReturn(false);
 
-        InvalidCredentialsException exception =
+        when(
+                pendingRegistrationRepository
+                        .existsByEmail("john@test.com")
+        ).thenReturn(false);
+
+        when(userRepository.existsByPhoneNumber("9876543210"))
+                .thenReturn(true);
+
+        UserPhoneAlreadyExistsException exception =
                 assertThrows(
-                        InvalidCredentialsException.class,
-                        () -> authService.login(request)
+                        UserPhoneAlreadyExistsException.class,
+                        () -> authService.register(request)
                 );
 
         assertEquals(
-                "Invalid email or password",
+                "User with phone number '9876543210' already exists",
                 exception.getMessage()
         );
 
         verify(userRepository)
-                .findByEmail(email);
+                .existsByEmail("john@test.com");
+
+        verify(userRepository)
+                .existsByPhoneNumber("9876543210");
+
+        verify(pendingRegistrationRepository)
+                .existsByEmail("john@test.com");
+
+        verify(pendingRegistrationRepository, never())
+                .save(any(PendingRegistration.class));
 
         verifyNoInteractions(
                 passwordEncoder,
-                jwtService
+                registrationOtpService
         );
     }
 
+    @Test
+    void shouldVerifyMobileRegistrationOtp() {
+
+        VerifyOtpResponse expectedResponse =
+                VerifyOtpResponse.builder()
+                        .message(
+                                "Mobile OTP verified. Email OTP sent successfully"
+                        )
+                        .verified(true)
+                        .nextStepRequired(true)
+                        .build();
+
+        when(
+                registrationOtpService.verifyMobileOtp(
+                        "9876543210",
+                        "123456"
+                )
+        ).thenReturn(expectedResponse);
+
+        VerifyOtpResponse response =
+                authService.verifyMobileRegistrationOtp(
+                        "9876543210",
+                        "123456"
+                );
+
+        assertEquals(
+                expectedResponse,
+                response
+        );
+
+        verify(registrationOtpService)
+                .verifyMobileOtp(
+                        "9876543210",
+                        "123456"
+                );
+    }
 
     @Test
-    void shouldRejectLoginWhenPasswordIsIncorrect() {
+    void shouldCompleteRegistrationAfterEmailOtp() {
 
-        String email = "john@test.com";
-        String password = "wrong-password";
-        String encodedPassword = "encoded-password";
+        PendingRegistration pendingRegistration =
+                PendingRegistration.builder()
+                        .id(1L)
+                        .name("John")
+                        .email("john@test.com")
+                        .phoneNumber("9876543210")
+                        .password("hashed-password")
+                        .mobileVerified(true)
+                        .emailVerified(false)
+                        .expiresAt(
+                                LocalDateTime.now()
+                                        .plusMinutes(10)
+                        )
+                        .createdAt(LocalDateTime.now())
+                        .build();
+
+        when(
+                pendingRegistrationRepository
+                        .findByEmail("john@test.com")
+        ).thenReturn(
+                Optional.of(pendingRegistration)
+        );
+
+        VerifyOtpResponse verificationResponse =
+                VerifyOtpResponse.builder()
+                        .message(
+                                "Email OTP verified successfully"
+                        )
+                        .verified(true)
+                        .nextStepRequired(false)
+                        .build();
+
+        when(
+                registrationOtpService.verifyEmailOtp(
+                        "john@test.com",
+                        "123456"
+                )
+        ).thenAnswer(invocation -> {
+            pendingRegistration.setEmailVerified(true);
+            return verificationResponse;
+        });
+
+        when(userRepository.existsByEmail("john@test.com"))
+                .thenReturn(false);
+
+        when(userRepository.existsByPhoneNumber("9876543210"))
+                .thenReturn(false);
+
+        User savedUser = User.builder()
+                .id(1L)
+                .name("John")
+                .email("john@test.com")
+                .phoneNumber("9876543210")
+                .password("hashed-password")
+                .role(Role.USER)
+                .build();
+
+        when(
+                userRepository.save(any(User.class))
+        ).thenReturn(savedUser);
+
+        RegisterResponse response =
+                authService.verifyEmailRegistrationOtp(
+                        "john@test.com",
+                        "123456"
+                );
+
+        assertNotNull(response);
+
+        assertEquals(
+                1L,
+                response.getId()
+        );
+
+        assertEquals(
+                "John",
+                response.getName()
+        );
+
+        assertEquals(
+                "john@test.com",
+                response.getEmail()
+        );
+
+        assertEquals(
+                "9876543210",
+                response.getPhoneNumber()
+        );
+
+        assertEquals(
+                Role.USER,
+                response.getRole()
+        );
+
+        verify(userRepository)
+                .save(any(User.class));
+
+        verify(pendingRegistrationRepository)
+                .delete(pendingRegistration);
+    }
+
+    @Test
+    void shouldLoginSuccessfully() {
 
         LoginRequest request = LoginRequest.builder()
-                .email(email)
-                .password(password)
+                .identifier("john@test.com")
+                .password("password123")
                 .build();
 
         User user = User.builder()
                 .id(1L)
-                .email(email)
-                .password(encodedPassword)
+                .name("John")
+                .email("john@test.com")
+                .password("hashed-password")
+                .phoneNumber("9876543210")
                 .role(Role.USER)
                 .build();
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmail("john@test.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                password,
-                encodedPassword
-        )).thenReturn(false);
+                "password123",
+                "hashed-password"
+        )).thenReturn(true);
 
-        InvalidCredentialsException exception =
-                assertThrows(
-                        InvalidCredentialsException.class,
-                        () -> authService.login(request)
-                );
+        LoginOtpResponse expectedResponse =
+                LoginOtpResponse.builder()
+                        .message(
+                                "Login OTP sent successfully"
+                        )
+                        .otpSent(true)
+                        .build();
+
+        when(
+                loginOtpService.sendLoginOtp(
+                        user.getEmail(),
+                        null
+                )
+        ).thenReturn(expectedResponse);
+
+        LoginOtpResponse response =
+                authService.login(request);
+
+        assertNotNull(response);
 
         assertEquals(
-                "Invalid email or password",
-                exception.getMessage()
+                "Login OTP sent successfully",
+                response.getMessage()
         );
 
-        verify(userRepository)
-                .findByEmail(email);
+        assertTrue(response.isOtpSent());
 
-        verify(passwordEncoder)
-                .matches(
-                        password,
-                        encodedPassword
+        verify(loginOtpService)
+                .sendLoginOtp(
+                        user.getEmail(),
+                        null
                 );
 
-        verifyNoInteractions(jwtService);
+        verify(jwtService, never())
+                .generateToken(
+                        anyString(),
+                        any(Role.class)
+                );
+    }
+
+    @Test
+    void shouldRejectLoginWithInvalidPassword() {
+
+        LoginRequest request = LoginRequest.builder()
+                .identifier("john@test.com")
+                .password("wrong-password")
+                .build();
+
+        User user = User.builder()
+                .email("john@test.com")
+                .password("hashed-password")
+                .role(Role.USER)
+                .build();
+
+        when(userRepository.findByEmail("john@test.com"))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                "wrong-password",
+                "hashed-password"
+        )).thenReturn(false);
+
+        assertThrows(
+                InvalidCredentialsException.class,
+                () -> authService.login(request)
+        );
+
+        verify(loginOtpService, never())
+                .sendLoginOtp(
+                        anyString(),
+                        anyString()
+                );
+
+        verify(jwtService, never())
+                .generateToken(
+                        anyString(),
+                        any(Role.class)
+                );
     }
 }

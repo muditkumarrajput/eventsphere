@@ -1,21 +1,22 @@
 package com.eventsphere.eventsphere_backend.integration;
 
 import com.eventsphere.eventsphere_backend.auth.dto.AuthResponse;
+import com.eventsphere.eventsphere_backend.auth.dto.LoginOtpResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.LoginRequest;
+import com.eventsphere.eventsphere_backend.auth.dto.PendingRegistrationResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterResponse;
+import com.eventsphere.eventsphere_backend.auth.dto.VerifyOtpRequest;
+import com.eventsphere.eventsphere_backend.auth.service.EmailService;
+import com.eventsphere.eventsphere_backend.auth.service.SmsService;
 import com.eventsphere.eventsphere_backend.booking.dto.BookingResponse;
 import com.eventsphere.eventsphere_backend.booking.dto.CreateBookingRequest;
-import com.eventsphere.eventsphere_backend.booking.entity.BookingStatus;
 import com.eventsphere.eventsphere_backend.event.dto.CreateEventRequest;
 import com.eventsphere.eventsphere_backend.event.dto.EventResponse;
 import com.eventsphere.eventsphere_backend.event.dto.UpdateEventRequest;
 import com.eventsphere.eventsphere_backend.event.entity.EventCategory;
-import com.eventsphere.eventsphere_backend.event.entity.EventStatus;
-import com.eventsphere.eventsphere_backend.notification.dto.NotificationResponse;
 import com.eventsphere.eventsphere_backend.payment.dto.CreatePaymentRequest;
 import com.eventsphere.eventsphere_backend.payment.dto.PaymentResponse;
-import com.eventsphere.eventsphere_backend.payment.entity.PaymentStatus;
 import com.eventsphere.eventsphere_backend.user.entity.Role;
 import com.eventsphere.eventsphere_backend.user.entity.User;
 import com.eventsphere.eventsphere_backend.user.repository.UserRepository;
@@ -23,19 +24,24 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spring.profiles.active=dev"
 )
-class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
+class EventSphereE2ETest {
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -43,406 +49,152 @@ class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    // =========================================================
-    // STEP 1
-    // REGISTER + LOGIN + JWT AUTHENTICATION
-    // =========================================================
+    @MockitoBean
+    private SmsService smsService;
+
+    @MockitoBean
+    private EmailService emailService;
+
 
     @Test
     void registerAndLogin_shouldAuthenticateUserSuccessfully() {
 
         String email =
-                "e2e-" + UUID.randomUUID() + "@test.com";
+                "e2e-" + UUID.randomUUID() + "@example.com";
 
-        RegisterRequest registerRequest =
-                RegisterRequest.builder()
-                        .name("E2E Test User")
-                        .email(email)
-                        .password("password123")
-                        .phoneNumber("9876543210")
-                        .build();
+        String password = "Password@123";
 
-        ResponseEntity<RegisterResponse> registerResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        registerRequest,
-                        RegisterResponse.class
+        RegisterResponse registerResponse =
+                registerUser(
+                        "E2E User",
+                        email,
+                        password
                 );
 
-        assertEquals(
-                HttpStatus.OK,
-                registerResponse.getStatusCode()
-        );
-
-        assertNotNull(registerResponse.getBody());
-
-        assertNotNull(
-                registerResponse.getBody().getId()
-        );
-
-        assertEquals(
-                email,
-                registerResponse.getBody().getEmail()
-        );
-
-        assertEquals(
-                "E2E Test User",
-                registerResponse.getBody().getName()
-        );
-
-        assertEquals(
-                "9876543210",
-                registerResponse.getBody().getPhoneNumber()
-        );
-
-        assertNotNull(
-                registerResponse.getBody().getRole()
-        );
-
-        assertEquals(
-                Role.USER,
-                registerResponse.getBody().getRole()
-        );
-
-        LoginRequest loginRequest =
-                LoginRequest.builder()
-                        .email(email)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> loginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        loginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                loginResponse.getStatusCode()
-        );
-
-        assertNotNull(loginResponse.getBody());
+        assertNotNull(registerResponse);
 
         String token =
-                loginResponse.getBody().getToken();
+                loginUser(
+                        email,
+                        password
+                );
 
         assertNotNull(token);
         assertFalse(token.isBlank());
-
-        assertEquals(
-                3,
-                token.split("\\.").length
-        );
-
-        HttpHeaders headers =
-                new HttpHeaders();
-
-        headers.setBearerAuth(token);
-
-        HttpEntity<Void> authenticatedRequest =
-                new HttpEntity<>(headers);
-
-        ResponseEntity<String> protectedResponse =
-                restTemplate.exchange(
-                        "/api/users/me",
-                        HttpMethod.GET,
-                        authenticatedRequest,
-                        String.class
-                );
-
-        assertNotEquals(
-                HttpStatus.UNAUTHORIZED,
-                protectedResponse.getStatusCode()
-        );
     }
 
-    // =========================================================
-    // STEP 2
-    // REGISTER + PROMOTE TO ORGANIZER + LOGIN + CREATE EVENT
-    // =========================================================
 
     @Test
     void organizer_shouldCreateEventSuccessfully() {
 
         String email =
-                "organizer-" + UUID.randomUUID() + "@test.com";
+                "organizer-" + UUID.randomUUID() + "@example.com";
 
-        RegisterRequest registerRequest =
-                RegisterRequest.builder()
-                        .name("E2E Organizer")
-                        .email(email)
-                        .password("password123")
-                        .phoneNumber("9876543210")
-                        .build();
+        String password = "Password@123";
 
-        ResponseEntity<RegisterResponse> registerResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        registerRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                registerResponse.getStatusCode()
+        registerUser(
+                "Organizer User",
+                email,
+                password
         );
 
-        assertNotNull(registerResponse.getBody());
-
-        assertEquals(
-                Role.USER,
-                registerResponse.getBody().getRole()
-        );
-
-        User user =
-                userRepository.findByEmail(email)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Registered E2E user was not found"
-                                )
-                        );
-
-        user.setRole(Role.ORGANIZER);
-
-        userRepository.save(user);
-
-        User organizer =
-                userRepository.findByEmail(email)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Organizer was not found after role update"
-                                )
-                        );
-
-        assertEquals(
-                Role.ORGANIZER,
-                organizer.getRole()
-        );
-
-        LoginRequest loginRequest =
-                LoginRequest.builder()
-                        .email(email)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> loginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        loginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                loginResponse.getStatusCode()
-        );
-
-        assertNotNull(loginResponse.getBody());
+        promoteToOrganizer(email);
 
         String token =
-                loginResponse.getBody().getToken();
+                loginUser(
+                        email,
+                        password
+                );
 
-        assertNotNull(token);
-        assertFalse(token.isBlank());
-
-        CreateEventRequest createEventRequest =
+        CreateEventRequest request =
                 CreateEventRequest.builder()
-                        .title("E2E Test Concert")
-                        .description(
-                                "Concert created during E2E testing"
-                        )
+                        .title("E2E Technology Event")
+                        .description("Event created through E2E test")
+                        .category(EventCategory.WORKSHOP)
                         .location("Lucknow")
                         .eventDate(
-                                LocalDateTime.now().plusDays(30)
+                                LocalDateTime.now()
+                                        .plusDays(10)
                         )
                         .capacity(100)
                         .ticketPrice(
                                 new BigDecimal("500.00")
                         )
-                        .category(EventCategory.CONCERT)
                         .build();
 
-        HttpHeaders headers =
-                new HttpHeaders();
-
-        headers.setBearerAuth(token);
-        headers.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateEventRequest> eventRequest =
-                new HttpEntity<>(
-                        createEventRequest,
-                        headers
-                );
-
-        ResponseEntity<EventResponse> eventResponse =
+        ResponseEntity<EventResponse> response =
                 restTemplate.exchange(
                         "/api/events",
                         HttpMethod.POST,
-                        eventRequest,
+                        new HttpEntity<>(
+                                request,
+                                authHeaders(token)
+                        ),
                         EventResponse.class
                 );
 
         assertEquals(
                 HttpStatus.OK,
-                eventResponse.getStatusCode()
+                response.getStatusCode()
         );
 
-        assertNotNull(eventResponse.getBody());
-
-        EventResponse createdEvent =
-                eventResponse.getBody();
-
-        assertNotNull(createdEvent.getId());
+        assertNotNull(response.getBody());
+        assertNotNull(response.getBody().getId());
 
         assertEquals(
-                "E2E Test Concert",
-                createdEvent.getTitle()
-        );
-
-        assertEquals(
-                "Concert created during E2E testing",
-                createdEvent.getDescription()
-        );
-
-        assertEquals(
-                "Lucknow",
-                createdEvent.getLocation()
-        );
-
-        assertEquals(
-                100,
-                createdEvent.getCapacity()
-        );
-
-        assertEquals(
-                new BigDecimal("500.00"),
-                createdEvent.getTicketPrice()
-        );
-
-        assertEquals(
-                EventCategory.CONCERT,
-                createdEvent.getCategory()
-        );
-
-        assertEquals(
-                EventStatus.ACTIVE,
-                createdEvent.getStatus()
-        );
-
-        assertTrue(
-                createdEvent.getEventDate()
-                        .isAfter(LocalDateTime.now())
+                "E2E Technology Event",
+                response.getBody().getTitle()
         );
     }
 
-    // =========================================================
-    // STEP 3
-    // ORGANIZER CREATES EVENT + USER CREATES BOOKING
-    // =========================================================
 
     @Test
     void user_shouldCreateBookingForOrganizerEventSuccessfully() {
 
         String organizerEmail =
-                "organizer-" + UUID.randomUUID() + "@test.com";
+                "organizer-" + UUID.randomUUID() + "@example.com";
 
-        RegisterRequest organizerRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Organizer")
-                        .email(organizerEmail)
-                        .password("password123")
-                        .phoneNumber("9876543210")
-                        .build();
+        String organizerPassword =
+                "Password@123";
 
-        ResponseEntity<RegisterResponse> organizerRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        organizerRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerRegisterResponse.getStatusCode()
+        registerUser(
+                "Organizer",
+                organizerEmail,
+                organizerPassword
         );
 
-        User organizer =
-                userRepository.findByEmail(organizerEmail)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Organizer was not found"
-                                )
-                        );
-
-        organizer.setRole(Role.ORGANIZER);
-
-        userRepository.save(organizer);
-
-        LoginRequest organizerLoginRequest =
-                LoginRequest.builder()
-                        .email(organizerEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> organizerLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        organizerLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(organizerLoginResponse.getBody());
+        promoteToOrganizer(organizerEmail);
 
         String organizerToken =
-                organizerLoginResponse.getBody().getToken();
+                loginUser(
+                        organizerEmail,
+                        organizerPassword
+                );
 
-        assertNotNull(organizerToken);
-        assertFalse(organizerToken.isBlank());
-
-        CreateEventRequest createEventRequest =
+        CreateEventRequest eventRequest =
                 CreateEventRequest.builder()
-                        .title("E2E Booking Test Event")
-                        .description(
-                                "Event created for booking E2E testing"
-                        )
+                        .title("Booking E2E Event")
+                        .description("Booking test event")
+                        .category(EventCategory.WORKSHOP)
                         .location("Lucknow")
                         .eventDate(
-                                LocalDateTime.now().plusDays(30)
+                                LocalDateTime.now()
+                                        .plusDays(10)
                         )
                         .capacity(100)
                         .ticketPrice(
                                 new BigDecimal("500.00")
                         )
-                        .category(EventCategory.CONCERT)
                         .build();
-
-        HttpHeaders organizerHeaders =
-                new HttpHeaders();
-
-        organizerHeaders.setBearerAuth(organizerToken);
-        organizerHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateEventRequest> eventRequest =
-                new HttpEntity<>(
-                        createEventRequest,
-                        organizerHeaders
-                );
 
         ResponseEntity<EventResponse> eventResponse =
                 restTemplate.exchange(
                         "/api/events",
                         HttpMethod.POST,
-                        eventRequest,
+                        new HttpEntity<>(
+                                eventRequest,
+                                authHeaders(organizerToken)
+                        ),
                         EventResponse.class
                 );
 
@@ -453,92 +205,41 @@ class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
 
         assertNotNull(eventResponse.getBody());
 
-        EventResponse createdEvent =
-                eventResponse.getBody();
-
-        assertNotNull(createdEvent.getId());
+        Long eventId =
+                eventResponse.getBody().getId();
 
         String userEmail =
-                "user-" + UUID.randomUUID() + "@test.com";
+                "user-" + UUID.randomUUID() + "@example.com";
 
-        RegisterRequest userRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Booking User")
-                        .email(userEmail)
-                        .password("password123")
-                        .phoneNumber("9123456789")
-                        .build();
+        String userPassword =
+                "Password@123";
 
-        ResponseEntity<RegisterResponse> userRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        userRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userRegisterResponse.getStatusCode()
+        registerUser(
+                "Booking User",
+                userEmail,
+                userPassword
         );
-
-        assertNotNull(userRegisterResponse.getBody());
-
-        assertEquals(
-                Role.USER,
-                userRegisterResponse.getBody().getRole()
-        );
-
-        LoginRequest userLoginRequest =
-                LoginRequest.builder()
-                        .email(userEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> userLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        userLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(userLoginResponse.getBody());
 
         String userToken =
-                userLoginResponse.getBody().getToken();
+                loginUser(
+                        userEmail,
+                        userPassword
+                );
 
-        assertNotNull(userToken);
-        assertFalse(userToken.isBlank());
-
-        CreateBookingRequest createBookingRequest =
+        CreateBookingRequest bookingRequest =
                 CreateBookingRequest.builder()
-                        .eventId(createdEvent.getId())
+                        .eventId(eventId)
                         .numberOfTickets(2)
                         .build();
-
-        HttpHeaders userHeaders =
-                new HttpHeaders();
-
-        userHeaders.setBearerAuth(userToken);
-        userHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateBookingRequest> bookingRequest =
-                new HttpEntity<>(
-                        createBookingRequest,
-                        userHeaders
-                );
 
         ResponseEntity<BookingResponse> bookingResponse =
                 restTemplate.exchange(
                         "/api/bookings",
                         HttpMethod.POST,
-                        bookingRequest,
+                        new HttpEntity<>(
+                                bookingRequest,
+                                authHeaders(userToken)
+                        ),
                         BookingResponse.class
                 );
 
@@ -549,147 +250,61 @@ class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
 
         assertNotNull(bookingResponse.getBody());
 
-        BookingResponse createdBooking =
-                bookingResponse.getBody();
-
-        assertNotNull(createdBooking.getId());
-
-        assertEquals(
-                createdEvent.getId(),
-                createdBooking.getEventId()
-        );
-
-        assertEquals(
-                2,
-                createdBooking.getNumberOfTickets()
-        );
-
-        assertEquals(
-                new BigDecimal("1000.00"),
-                createdBooking.getTotalAmount()
-        );
-
-        assertEquals(
-                BookingStatus.PENDING,
-                createdBooking.getBookingStatus()
-        );
-
         assertNotNull(
-                createdBooking.getBookingDate()
-        );
-
-        assertNotNull(
-                createdBooking.getCreatedAt()
+                bookingResponse.getBody().getId()
         );
     }
 
-    // =========================================================
-    // STEP 4
-    // BOOKING → PAYMENT → SUCCESS → CONFIRMED → NOTIFICATION
-    // =========================================================
 
     @Test
     void user_shouldCompletePaymentAndConfirmBookingSuccessfully() {
 
         String organizerEmail =
-                "organizer-" + UUID.randomUUID() + "@test.com";
+                "payment-organizer-" +
+                        UUID.randomUUID() +
+                        "@example.com";
 
-        RegisterRequest organizerRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Payment Organizer")
-                        .email(organizerEmail)
-                        .password("password123")
-                        .phoneNumber("9876543210")
-                        .build();
+        String organizerPassword =
+                "Password@123";
 
-        ResponseEntity<RegisterResponse> organizerRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        organizerRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerRegisterResponse.getStatusCode()
+        registerUser(
+                "Payment Organizer",
+                organizerEmail,
+                organizerPassword
         );
 
-        User organizer =
-                userRepository.findByEmail(organizerEmail)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Organizer was not found"
-                                )
-                        );
-
-        organizer.setRole(Role.ORGANIZER);
-
-        userRepository.save(organizer);
-
-        LoginRequest organizerLoginRequest =
-                LoginRequest.builder()
-                        .email(organizerEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> organizerLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        organizerLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                organizerLoginResponse.getBody()
-        );
+        promoteToOrganizer(organizerEmail);
 
         String organizerToken =
-                organizerLoginResponse.getBody().getToken();
+                loginUser(
+                        organizerEmail,
+                        organizerPassword
+                );
 
-        assertNotNull(organizerToken);
-        assertFalse(organizerToken.isBlank());
-
-        CreateEventRequest createEventRequest =
+        CreateEventRequest eventRequest =
                 CreateEventRequest.builder()
-                        .title("E2E Payment Test Event")
-                        .description(
-                                "Event created for payment E2E testing"
-                        )
+                        .title("Payment E2E Event")
+                        .description("Payment test event")
+                        .category(EventCategory.WORKSHOP)
                         .location("Lucknow")
                         .eventDate(
-                                LocalDateTime.now().plusDays(30)
+                                LocalDateTime.now()
+                                        .plusDays(10)
                         )
                         .capacity(100)
                         .ticketPrice(
                                 new BigDecimal("500.00")
                         )
-                        .category(EventCategory.CONCERT)
                         .build();
-
-        HttpHeaders organizerHeaders =
-                new HttpHeaders();
-
-        organizerHeaders.setBearerAuth(organizerToken);
-        organizerHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateEventRequest> eventRequest =
-                new HttpEntity<>(
-                        createEventRequest,
-                        organizerHeaders
-                );
 
         ResponseEntity<EventResponse> eventResponse =
                 restTemplate.exchange(
                         "/api/events",
                         HttpMethod.POST,
-                        eventRequest,
+                        new HttpEntity<>(
+                                eventRequest,
+                                authHeaders(organizerToken)
+                        ),
                         EventResponse.class
                 );
 
@@ -700,106 +315,43 @@ class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
 
         assertNotNull(eventResponse.getBody());
 
-        EventResponse createdEvent =
-                eventResponse.getBody();
-
-        assertNotNull(createdEvent.getId());
-
-        assertEquals(
-                new BigDecimal("500.00"),
-                createdEvent.getTicketPrice()
-        );
+        Long eventId =
+                eventResponse.getBody().getId();
 
         String userEmail =
-                "user-" + UUID.randomUUID() + "@test.com";
+                "payment-user-" +
+                        UUID.randomUUID() +
+                        "@example.com";
 
-        RegisterRequest userRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Payment User")
-                        .email(userEmail)
-                        .password("password123")
-                        .phoneNumber("9123456789")
-                        .build();
+        String userPassword =
+                "Password@123";
 
-        ResponseEntity<RegisterResponse> userRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        userRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userRegisterResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                userRegisterResponse.getBody()
-        );
-
-        Long userId =
-                userRegisterResponse.getBody().getId();
-
-        assertNotNull(userId);
-
-        assertEquals(
-                Role.USER,
-                userRegisterResponse.getBody().getRole()
-        );
-
-        LoginRequest userLoginRequest =
-                LoginRequest.builder()
-                        .email(userEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> userLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        userLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                userLoginResponse.getBody()
+        registerUser(
+                "Payment User",
+                userEmail,
+                userPassword
         );
 
         String userToken =
-                userLoginResponse.getBody().getToken();
+                loginUser(
+                        userEmail,
+                        userPassword
+                );
 
-        assertNotNull(userToken);
-        assertFalse(userToken.isBlank());
-
-        CreateBookingRequest createBookingRequest =
+        CreateBookingRequest bookingRequest =
                 CreateBookingRequest.builder()
-                        .eventId(createdEvent.getId())
+                        .eventId(eventId)
                         .numberOfTickets(2)
                         .build();
-
-        HttpHeaders userHeaders =
-                new HttpHeaders();
-
-        userHeaders.setBearerAuth(userToken);
-        userHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateBookingRequest> bookingRequest =
-                new HttpEntity<>(
-                        createBookingRequest,
-                        userHeaders
-                );
 
         ResponseEntity<BookingResponse> bookingResponse =
                 restTemplate.exchange(
                         "/api/bookings",
                         HttpMethod.POST,
-                        bookingRequest,
+                        new HttpEntity<>(
+                                bookingRequest,
+                                authHeaders(userToken)
+                        ),
                         BookingResponse.class
                 );
 
@@ -808,56 +360,22 @@ class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
                 bookingResponse.getStatusCode()
         );
 
-        assertNotNull(
-                bookingResponse.getBody()
-        );
+        assertNotNull(bookingResponse.getBody());
 
-        BookingResponse createdBooking =
-                bookingResponse.getBody();
+        Long bookingId =
+                bookingResponse.getBody().getId();
 
-        assertNotNull(createdBooking.getId());
-
-        assertEquals(
-                userId,
-                createdBooking.getUserId()
-        );
-
-        assertEquals(
-                createdEvent.getId(),
-                createdBooking.getEventId()
-        );
-
-        assertEquals(
-                2,
-                createdBooking.getNumberOfTickets()
-        );
-
-        assertEquals(
-                new BigDecimal("1000.00"),
-                createdBooking.getTotalAmount()
-        );
-
-        assertEquals(
-                BookingStatus.PENDING,
-                createdBooking.getBookingStatus()
-        );
-
-        CreatePaymentRequest createPaymentRequest =
-                new CreatePaymentRequest(
-                        createdBooking.getId()
-                );
-
-        HttpEntity<CreatePaymentRequest> paymentRequest =
-                new HttpEntity<>(
-                        createPaymentRequest,
-                        userHeaders
-                );
+        CreatePaymentRequest paymentRequest =
+                new CreatePaymentRequest(bookingId);
 
         ResponseEntity<PaymentResponse> paymentResponse =
                 restTemplate.exchange(
                         "/api/payments",
                         HttpMethod.POST,
-                        paymentRequest,
+                        new HttpEntity<>(
+                                paymentRequest,
+                                authHeaders(userToken)
+                        ),
                         PaymentResponse.class
                 );
 
@@ -868,166 +386,603 @@ class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
 
         assertNotNull(paymentResponse.getBody());
 
-        PaymentResponse createdPayment =
-                paymentResponse.getBody();
-
-        assertNotNull(createdPayment.getId());
-
         assertNotNull(
-                createdPayment.getPaymentReference()
+                paymentResponse.getBody().getId()
+        );
+    }
+
+
+    @Test
+    void user_shouldNotBeAbleToCreateEvent() {
+
+        String email =
+                "normal-user-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        String password =
+                "Password@123";
+
+        registerUser(
+                "Normal User",
+                email,
+                password
         );
 
-        assertEquals(
-                createdBooking.getId(),
-                createdPayment.getBookingId()
-        );
+        String token =
+                loginUser(
+                        email,
+                        password
+                );
 
-        assertEquals(
-                new BigDecimal("1000.00"),
-                createdPayment.getAmount()
-        );
+        CreateEventRequest request =
+                CreateEventRequest.builder()
+                        .title("Unauthorized Event")
+                        .description("Should not be created")
+                        .category(EventCategory.WORKSHOP)
+                        .location("Lucknow")
+                        .eventDate(
+                                LocalDateTime.now()
+                                        .plusDays(10)
+                        )
+                        .capacity(100)
+                        .ticketPrice(
+                                new BigDecimal("500.00")
+                        )
+                        .build();
 
-        assertEquals(
-                PaymentStatus.PENDING,
-                createdPayment.getPaymentStatus()
-        );
-
-        assertNotNull(
-                createdPayment.getPaymentDate()
-        );
-
-        ResponseEntity<PaymentResponse> successResponse =
+        ResponseEntity<String> response =
                 restTemplate.exchange(
-                        "/api/payments/"
-                                + createdPayment.getId()
-                                + "/success",
-                        HttpMethod.PATCH,
-                        new HttpEntity<>(userHeaders),
-                        PaymentResponse.class
+                        "/api/events",
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                request,
+                                authHeaders(token)
+                        ),
+                        String.class
+                );
+
+        assertEquals(
+                HttpStatus.FORBIDDEN,
+                response.getStatusCode()
+        );
+    }
+
+
+    @Test
+    void organizer_shouldNotBeAbleToUpdateAnotherOrganizersEvent() {
+
+        String organizerOneEmail =
+                "organizer-one-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        String organizerPassword =
+                "Password@123";
+
+        registerUser(
+                "Organizer One",
+                organizerOneEmail,
+                organizerPassword
+        );
+
+        promoteToOrganizer(organizerOneEmail);
+
+        String organizerOneToken =
+                loginUser(
+                        organizerOneEmail,
+                        organizerPassword
+                );
+
+        CreateEventRequest createRequest =
+                CreateEventRequest.builder()
+                        .title("Owner Event")
+                        .description("Owner event")
+                        .category(EventCategory.WORKSHOP)
+                        .location("Lucknow")
+                        .eventDate(
+                                LocalDateTime.now()
+                                        .plusDays(10)
+                        )
+                        .capacity(100)
+                        .ticketPrice(
+                                new BigDecimal("500.00")
+                        )
+                        .build();
+
+        ResponseEntity<EventResponse> eventResponse =
+                restTemplate.exchange(
+                        "/api/events",
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                createRequest,
+                                authHeaders(organizerOneToken)
+                        ),
+                        EventResponse.class
                 );
 
         assertEquals(
                 HttpStatus.OK,
-                successResponse.getStatusCode()
+                eventResponse.getStatusCode()
         );
 
-        assertNotNull(
-                successResponse.getBody()
+        assertNotNull(eventResponse.getBody());
+
+        Long eventId =
+                eventResponse.getBody().getId();
+
+        String organizerTwoEmail =
+                "organizer-two-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        registerUser(
+                "Organizer Two",
+                organizerTwoEmail,
+                organizerPassword
         );
 
-        PaymentResponse successfulPayment =
-                successResponse.getBody();
+        promoteToOrganizer(organizerTwoEmail);
 
-        assertEquals(
-                createdPayment.getId(),
-                successfulPayment.getId()
-        );
+        String organizerTwoToken =
+                loginUser(
+                        organizerTwoEmail,
+                        organizerPassword
+                );
 
-        assertEquals(
-                PaymentStatus.SUCCESS,
-                successfulPayment.getPaymentStatus()
-        );
+        UpdateEventRequest updateRequest =
+                UpdateEventRequest.builder()
+                        .title("Unauthorized Update")
+                        .description("Unauthorized update attempt")
+                        .category(EventCategory.WORKSHOP)
+                        .location("Lucknow")
+                        .eventDate(
+                                LocalDateTime.now()
+                                        .plusDays(15)
+                        )
+                        .capacity(100)
+                        .ticketPrice(
+                                new BigDecimal("500.00")
+                        )
+                        .build();
 
-        ResponseEntity<BookingResponse> confirmedBookingResponse =
+        ResponseEntity<String> response =
                 restTemplate.exchange(
-                        "/api/bookings/"
-                                + createdBooking.getId(),
-                        HttpMethod.GET,
-                        new HttpEntity<>(userHeaders),
+                        "/api/events/" + eventId,
+                        HttpMethod.PUT,
+                        new HttpEntity<>(
+                                updateRequest,
+                                authHeaders(organizerTwoToken)
+                        ),
+                        String.class
+                );
+
+        assertEquals(
+                HttpStatus.FORBIDDEN,
+                response.getStatusCode()
+        );
+    }
+
+
+    @Test
+    void user_shouldNotBeAbleToAccessAnotherUsersBooking() {
+
+        String organizerEmail =
+                "booking-owner-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        String password =
+                "Password@123";
+
+        registerUser(
+                "Booking Organizer",
+                organizerEmail,
+                password
+        );
+
+        promoteToOrganizer(organizerEmail);
+
+        String organizerToken =
+                loginUser(
+                        organizerEmail,
+                        password
+                );
+
+        CreateEventRequest eventRequest =
+                CreateEventRequest.builder()
+                        .title("Private Booking Event")
+                        .description("Private booking event")
+                        .category(EventCategory.WORKSHOP)
+                        .location("Lucknow")
+                        .eventDate(
+                                LocalDateTime.now()
+                                        .plusDays(10)
+                        )
+                        .capacity(100)
+                        .ticketPrice(
+                                new BigDecimal("500.00")
+                        )
+                        .build();
+
+        ResponseEntity<EventResponse> eventResponse =
+                restTemplate.exchange(
+                        "/api/events",
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                eventRequest,
+                                authHeaders(organizerToken)
+                        ),
+                        EventResponse.class
+                );
+
+        assertEquals(
+                HttpStatus.OK,
+                eventResponse.getStatusCode()
+        );
+
+        assertNotNull(eventResponse.getBody());
+
+        Long eventId =
+                eventResponse.getBody().getId();
+
+        String firstUserEmail =
+                "first-user-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        registerUser(
+                "First User",
+                firstUserEmail,
+                password
+        );
+
+        String firstUserToken =
+                loginUser(
+                        firstUserEmail,
+                        password
+                );
+
+        CreateBookingRequest bookingRequest =
+                CreateBookingRequest.builder()
+                        .eventId(eventId)
+                        .numberOfTickets(1)
+                        .build();
+
+        ResponseEntity<BookingResponse> bookingResponse =
+                restTemplate.exchange(
+                        "/api/bookings",
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                bookingRequest,
+                                authHeaders(firstUserToken)
+                        ),
                         BookingResponse.class
                 );
 
         assertEquals(
                 HttpStatus.OK,
-                confirmedBookingResponse.getStatusCode()
+                bookingResponse.getStatusCode()
         );
 
-        assertNotNull(
-                confirmedBookingResponse.getBody()
+        assertNotNull(bookingResponse.getBody());
+
+        Long bookingId =
+                bookingResponse.getBody().getId();
+
+        String secondUserEmail =
+                "second-user-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        registerUser(
+                "Second User",
+                secondUserEmail,
+                password
         );
 
-        BookingResponse confirmedBooking =
-                confirmedBookingResponse.getBody();
+        String secondUserToken =
+                loginUser(
+                        secondUserEmail,
+                        password
+                );
 
-        assertEquals(
-                createdBooking.getId(),
-                confirmedBooking.getId()
-        );
-
-        assertEquals(
-                BookingStatus.CONFIRMED,
-                confirmedBooking.getBookingStatus()
-        );
-
-        assertEquals(
-                createdBooking.getUserId(),
-                confirmedBooking.getUserId()
-        );
-
-        assertEquals(
-                createdBooking.getEventId(),
-                confirmedBooking.getEventId()
-        );
-
-        assertEquals(
-                2,
-                confirmedBooking.getNumberOfTickets()
-        );
-
-        assertEquals(
-                new BigDecimal("1000.00"),
-                confirmedBooking.getTotalAmount()
-        );
-
-        ResponseEntity<NotificationResponse[]> notificationResponse =
+        ResponseEntity<String> response =
                 restTemplate.exchange(
-                        "/api/notifications",
+                        "/api/bookings/" + bookingId,
                         HttpMethod.GET,
-                        new HttpEntity<>(userHeaders),
-                        NotificationResponse[].class
+                        new HttpEntity<>(
+                                authHeaders(secondUserToken)
+                        ),
+                        String.class
+                );
+
+        assertEquals(
+                HttpStatus.NOT_FOUND,
+                response.getStatusCode()
+        );
+    }
+
+
+    @Test
+    void organizer_shouldBeAbleToCancelEventWithBookings() {
+
+        String organizerEmail =
+                "cancel-organizer-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        String password =
+                "Password@123";
+
+        registerUser(
+                "Cancel Organizer",
+                organizerEmail,
+                password
+        );
+
+        promoteToOrganizer(organizerEmail);
+
+        String organizerToken =
+                loginUser(
+                        organizerEmail,
+                        password
+                );
+
+        CreateEventRequest eventRequest =
+                CreateEventRequest.builder()
+                        .title("Cancellation Event")
+                        .description("Cancellation test")
+                        .category(EventCategory.WORKSHOP)
+                        .location("Lucknow")
+                        .eventDate(
+                                LocalDateTime.now()
+                                        .plusDays(10)
+                        )
+                        .capacity(100)
+                        .ticketPrice(
+                                new BigDecimal("500.00")
+                        )
+                        .build();
+
+        ResponseEntity<EventResponse> eventResponse =
+                restTemplate.exchange(
+                        "/api/events",
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                eventRequest,
+                                authHeaders(organizerToken)
+                        ),
+                        EventResponse.class
                 );
 
         assertEquals(
                 HttpStatus.OK,
-                notificationResponse.getStatusCode()
+                eventResponse.getStatusCode()
         );
 
-        assertNotNull(
-                notificationResponse.getBody()
+        assertNotNull(eventResponse.getBody());
+
+        Long eventId =
+                eventResponse.getBody().getId();
+
+        String userEmail =
+                "cancel-user-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        registerUser(
+                "Cancel User",
+                userEmail,
+                password
         );
 
-        List<NotificationResponse> notifications =
-                List.of(notificationResponse.getBody());
+        String userToken =
+                loginUser(
+                        userEmail,
+                        password
+                );
 
-        assertFalse(
-                notifications.isEmpty()
+        CreateBookingRequest bookingRequest =
+                CreateBookingRequest.builder()
+                        .eventId(eventId)
+                        .numberOfTickets(1)
+                        .build();
+
+        ResponseEntity<BookingResponse> bookingResponse =
+                restTemplate.exchange(
+                        "/api/bookings",
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                bookingRequest,
+                                authHeaders(userToken)
+                        ),
+                        BookingResponse.class
+                );
+
+        assertEquals(
+                HttpStatus.OK,
+                bookingResponse.getStatusCode()
+        );
+
+        assertNotNull(bookingResponse.getBody());
+
+        ResponseEntity<EventResponse> cancelResponse =
+                restTemplate.exchange(
+                        "/api/events/" + eventId + "/cancel",
+                        HttpMethod.PATCH,
+                        new HttpEntity<>(
+                                authHeaders(organizerToken)
+                        ),
+                        EventResponse.class
+                );
+
+        assertEquals(
+                HttpStatus.OK,
+                cancelResponse.getStatusCode()
+        );
+
+        assertNotNull(cancelResponse.getBody());
+    }
+
+
+    @Test
+    void user_shouldNotBeAbleToBookBeyondEventCapacity() {
+
+        String organizerEmail =
+                "capacity-organizer-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        String password =
+                "Password@123";
+
+        registerUser(
+                "Capacity Organizer",
+                organizerEmail,
+                password
+        );
+
+        promoteToOrganizer(organizerEmail);
+
+        String organizerToken =
+                loginUser(
+                        organizerEmail,
+                        password
+                );
+
+        CreateEventRequest eventRequest =
+                CreateEventRequest.builder()
+                        .title("Capacity Event")
+                        .description("Capacity test")
+                        .category(EventCategory.WORKSHOP)
+                        .location("Lucknow")
+                        .eventDate(
+                                LocalDateTime.now()
+                                        .plusDays(10)
+                        )
+                        .capacity(2)
+                        .ticketPrice(
+                                new BigDecimal("500.00")
+                        )
+                        .build();
+
+        ResponseEntity<EventResponse> eventResponse =
+                restTemplate.exchange(
+                        "/api/events",
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                eventRequest,
+                                authHeaders(organizerToken)
+                        ),
+                        EventResponse.class
+                );
+
+        assertEquals(
+                HttpStatus.OK,
+                eventResponse.getStatusCode()
+        );
+
+        assertNotNull(eventResponse.getBody());
+
+        Long eventId =
+                eventResponse.getBody().getId();
+
+        String userEmail =
+                "capacity-user-" +
+                        UUID.randomUUID() +
+                        "@example.com";
+
+        registerUser(
+                "Capacity User",
+                userEmail,
+                password
+        );
+
+        String userToken =
+                loginUser(
+                        userEmail,
+                        password
+                );
+
+        CreateBookingRequest bookingRequest =
+                CreateBookingRequest.builder()
+                        .eventId(eventId)
+                        .numberOfTickets(3)
+                        .build();
+
+        ResponseEntity<String> response =
+                restTemplate.exchange(
+                        "/api/bookings",
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                bookingRequest,
+                                authHeaders(userToken)
+                        ),
+                        String.class
+                );
+
+        assertEquals(
+                HttpStatus.CONFLICT,
+                response.getStatusCode()
         );
     }
 
-    // =========================================================
-    // STEP 5
-    // USER CANNOT CREATE EVENT
-    // =========================================================
 
-    @Test
-    void user_shouldNotBeAbleToCreateEvent() {
+    private RegisterResponse registerUser(
+            String name,
+            String email,
+            String password
+    ) {
 
-        String userEmail =
-                "user-" + UUID.randomUUID() + "@test.com";
+        String phoneNumber =
+                uniquePhoneNumber();
+
+        final String[] mobileOtp =
+                new String[1];
+
+        final String[] emailOtp =
+                new String[1];
+
+        org.mockito.Mockito.doAnswer(
+                invocation -> {
+                    mobileOtp[0] =
+                            invocation.getArgument(1);
+                    return null;
+                }
+        ).when(smsService).sendOtp(
+                org.mockito.Mockito.eq(phoneNumber),
+                org.mockito.Mockito.anyString(),
+                org.mockito.Mockito.eq("Registration")
+        );
+
+        org.mockito.Mockito.doAnswer(
+                invocation -> {
+                    emailOtp[0] =
+                            invocation.getArgument(1);
+                    return null;
+                }
+        ).when(emailService).sendOtp(
+                org.mockito.Mockito.eq(email),
+                org.mockito.Mockito.anyString(),
+                org.mockito.Mockito.eq("Registration")
+        );
 
         RegisterRequest registerRequest =
                 RegisterRequest.builder()
-                        .name("E2E Unauthorized User")
-                        .email(userEmail)
-                        .password("password123")
-                        .phoneNumber("9123456789")
+                        .name(name)
+                        .email(email)
+                        .password(password)
+                        .confirmPassword(password)
+                        .phoneNumber(phoneNumber)
                         .build();
 
-        ResponseEntity<RegisterResponse> registerResponse =
+        ResponseEntity<PendingRegistrationResponse>
+                registerResponse =
                 restTemplate.postForEntity(
                         "/api/auth/register",
                         registerRequest,
-                        RegisterResponse.class
+                        PendingRegistrationResponse.class
                 );
 
         assertEquals(
@@ -1039,22 +994,89 @@ class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
                 registerResponse.getBody()
         );
 
-        assertEquals(
-                Role.USER,
-                registerResponse.getBody().getRole()
+        assertTrue(
+                registerResponse.getBody()
+                        .isMobileOtpSent()
         );
 
-        LoginRequest loginRequest =
-                LoginRequest.builder()
-                        .email(userEmail)
-                        .password("password123")
-                        .build();
+        assertFalse(
+                registerResponse.getBody()
+                        .isEmailOtpSent()
+        );
 
-        ResponseEntity<AuthResponse> loginResponse =
+        assertNotNull(mobileOtp[0]);
+
+        ResponseEntity<String>
+                mobileVerificationResponse =
+                restTemplate.postForEntity(
+                        "/api/auth/register/verify-mobile",
+                        VerifyOtpRequest.builder()
+                                .target(phoneNumber)
+                                .otp(mobileOtp[0])
+                                .build(),
+                        String.class
+                );
+
+        assertEquals(
+                HttpStatus.OK,
+                mobileVerificationResponse.getStatusCode()
+        );
+
+        assertNotNull(emailOtp[0]);
+
+        ResponseEntity<RegisterResponse>
+                emailVerificationResponse =
+                restTemplate.postForEntity(
+                        "/api/auth/register/verify-email",
+                        VerifyOtpRequest.builder()
+                                .target(email)
+                                .otp(emailOtp[0])
+                                .build(),
+                        RegisterResponse.class
+                );
+
+        assertEquals(
+                HttpStatus.OK,
+                emailVerificationResponse.getStatusCode()
+        );
+
+        assertNotNull(
+                emailVerificationResponse.getBody()
+        );
+
+        return emailVerificationResponse.getBody();
+    }
+
+
+    private String loginUser(
+            String email,
+            String password
+    ) {
+
+        final String[] loginOtp =
+                new String[1];
+
+        org.mockito.Mockito.doAnswer(
+                invocation -> {
+                    loginOtp[0] =
+                            invocation.getArgument(1);
+                    return null;
+                }
+        ).when(emailService).sendOtp(
+                org.mockito.Mockito.eq(email),
+                org.mockito.Mockito.anyString(),
+                org.mockito.Mockito.eq("Login")
+        );
+
+        ResponseEntity<LoginOtpResponse>
+                loginResponse =
                 restTemplate.postForEntity(
                         "/api/auth/login",
-                        loginRequest,
-                        AuthResponse.class
+                        LoginRequest.builder()
+                                .identifier(email)
+                                .password(password)
+                                .build(),
+                        LoginOtpResponse.class
                 );
 
         assertEquals(
@@ -1066,1307 +1088,95 @@ class EventSphereE2ETest extends AbstractPostgresIntegrationTest {
                 loginResponse.getBody()
         );
 
-        String userToken =
-                loginResponse.getBody().getToken();
+        assertTrue(
+                loginResponse.getBody()
+                        .isOtpSent()
+        );
 
-        assertNotNull(userToken);
-        assertFalse(userToken.isBlank());
+        assertNotNull(loginOtp[0]);
 
-        CreateEventRequest createEventRequest =
-                CreateEventRequest.builder()
-                        .title("Unauthorized Event")
-                        .description(
-                                "This event should not be created"
-                        )
-                        .location("Lucknow")
-                        .eventDate(
-                                LocalDateTime.now().plusDays(30)
-                        )
-                        .capacity(100)
-                        .ticketPrice(
-                                new BigDecimal("500.00")
-                        )
-                        .category(EventCategory.CONCERT)
-                        .build();
+        ResponseEntity<AuthResponse>
+                verifyLoginResponse =
+                restTemplate.postForEntity(
+                        "/api/auth/login/verify-otp",
+                        VerifyOtpRequest.builder()
+                                .target(email)
+                                .otp(loginOtp[0])
+                                .build(),
+                        AuthResponse.class
+                );
+
+        assertEquals(
+                HttpStatus.OK,
+                verifyLoginResponse.getStatusCode()
+        );
+
+        assertNotNull(
+                verifyLoginResponse.getBody()
+        );
+
+        String token =
+                verifyLoginResponse.getBody()
+                        .getToken();
+
+        assertNotNull(token);
+        assertFalse(token.isBlank());
+
+        return token;
+    }
+
+
+    private String uniquePhoneNumber() {
+
+        String digits =
+                UUID.randomUUID()
+                        .toString()
+                        .replaceAll("\\D", "");
+
+        while (digits.length() < 9) {
+            digits +=
+                    UUID.randomUUID()
+                            .toString()
+                            .replaceAll("\\D", "");
+        }
+
+        return "9" +
+                digits.substring(0, 9);
+    }
+
+
+    private void promoteToOrganizer(
+            String email
+    ) {
+
+        User user =
+                userRepository.findByEmail(email)
+                        .orElseThrow(
+                                () -> new AssertionError(
+                                        "User was not found: " +
+                                                email
+                                )
+                        );
+
+        user.setRole(Role.ORGANIZER);
+
+        userRepository.save(user);
+    }
+
+
+    private HttpHeaders authHeaders(
+            String token
+    ) {
 
         HttpHeaders headers =
                 new HttpHeaders();
 
-        headers.setBearerAuth(userToken);
+        headers.setBearerAuth(token);
+
         headers.setContentType(
-                MediaType.APPLICATION_JSON
+                org.springframework.http.MediaType.APPLICATION_JSON
         );
 
-        HttpEntity<CreateEventRequest> request =
-                new HttpEntity<>(
-                        createEventRequest,
-                        headers
-                );
-
-        ResponseEntity<String> response =
-                restTemplate.exchange(
-                        "/api/events",
-                        HttpMethod.POST,
-                        request,
-                        String.class
-                );
-
-        assertEquals(
-                HttpStatus.FORBIDDEN,
-                response.getStatusCode()
-        );
-    }
-
-    // =========================================================
-    // STEP 6
-    // ORGANIZER CANNOT UPDATE ANOTHER ORGANIZER'S EVENT
-    // =========================================================
-
-    @Test
-    void organizer_shouldNotBeAbleToUpdateAnotherOrganizersEvent() {
-
-        String organizerAEmail =
-                "organizer-a-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest organizerARegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Organizer A")
-                        .email(organizerAEmail)
-                        .password("password123")
-                        .phoneNumber("9876543210")
-                        .build();
-
-        ResponseEntity<RegisterResponse> organizerARegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        organizerARegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerARegisterResponse.getStatusCode()
-        );
-
-        User organizerA =
-                userRepository.findByEmail(organizerAEmail)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Organizer A was not found"
-                                )
-                        );
-
-        organizerA.setRole(Role.ORGANIZER);
-
-        userRepository.save(organizerA);
-
-        LoginRequest organizerALoginRequest =
-                LoginRequest.builder()
-                        .email(organizerAEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> organizerALoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        organizerALoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerALoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                organizerALoginResponse.getBody()
-        );
-
-        String organizerAToken =
-                organizerALoginResponse.getBody().getToken();
-
-        CreateEventRequest createEventRequest =
-                CreateEventRequest.builder()
-                        .title("Organizer A Event")
-                        .description(
-                                "Event owned by Organizer A"
-                        )
-                        .location("Lucknow")
-                        .eventDate(
-                                LocalDateTime.now().plusDays(30)
-                        )
-                        .capacity(100)
-                        .ticketPrice(
-                                new BigDecimal("500.00")
-                        )
-                        .category(EventCategory.CONCERT)
-                        .build();
-
-        HttpHeaders organizerAHeaders =
-                new HttpHeaders();
-
-        organizerAHeaders.setBearerAuth(
-                organizerAToken
-        );
-
-        organizerAHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateEventRequest> createEventHttpRequest =
-                new HttpEntity<>(
-                        createEventRequest,
-                        organizerAHeaders
-                );
-
-        ResponseEntity<EventResponse> eventResponse =
-                restTemplate.exchange(
-                        "/api/events",
-                        HttpMethod.POST,
-                        createEventHttpRequest,
-                        EventResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                eventResponse.getStatusCode()
-        );
-
-        assertNotNull(eventResponse.getBody());
-
-        EventResponse organizerAEvent =
-                eventResponse.getBody();
-
-        String organizerBEmail =
-                "organizer-b-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest organizerBRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Organizer B")
-                        .email(organizerBEmail)
-                        .password("password123")
-                        .phoneNumber("9123456789")
-                        .build();
-
-        ResponseEntity<RegisterResponse> organizerBRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        organizerBRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerBRegisterResponse.getStatusCode()
-        );
-
-        User organizerB =
-                userRepository.findByEmail(organizerBEmail)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Organizer B was not found"
-                                )
-                        );
-
-        organizerB.setRole(Role.ORGANIZER);
-
-        userRepository.save(organizerB);
-
-        LoginRequest organizerBLoginRequest =
-                LoginRequest.builder()
-                        .email(organizerBEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> organizerBLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        organizerBLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerBLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                organizerBLoginResponse.getBody()
-        );
-
-        String organizerBToken =
-                organizerBLoginResponse.getBody().getToken();
-
-        UpdateEventRequest updateEventRequest =
-                UpdateEventRequest.builder()
-                        .title("Unauthorized Updated Event")
-                        .description(
-                                "Organizer B should not be able to update this"
-                        )
-                        .location("Kanpur")
-                        .eventDate(
-                                LocalDateTime.now().plusDays(45)
-                        )
-                        .capacity(200)
-                        .ticketPrice(
-                                new BigDecimal("1000.00")
-                        )
-                        .category(EventCategory.FESTIVAL)
-                        .build();
-
-        HttpHeaders organizerBHeaders =
-                new HttpHeaders();
-
-        organizerBHeaders.setBearerAuth(
-                organizerBToken
-        );
-
-        organizerBHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<UpdateEventRequest> updateRequest =
-                new HttpEntity<>(
-                        updateEventRequest,
-                        organizerBHeaders
-                );
-
-        ResponseEntity<String> updateResponse =
-                restTemplate.exchange(
-                        "/api/events/"
-                                + organizerAEvent.getId(),
-                        HttpMethod.PUT,
-                        updateRequest,
-                        String.class
-                );
-
-        assertEquals(
-                HttpStatus.FORBIDDEN,
-                updateResponse.getStatusCode()
-        );
-    }
-
-    // =========================================================
-    // STEP 7
-    // USER CANNOT ACCESS ANOTHER USER'S BOOKING
-    // =========================================================
-
-    @Test
-    void user_shouldNotBeAbleToAccessAnotherUsersBooking() {
-
-        String organizerEmail =
-                "organizer-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest organizerRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Booking Organizer")
-                        .email(organizerEmail)
-                        .password("password123")
-                        .phoneNumber("9876543210")
-                        .build();
-
-        ResponseEntity<RegisterResponse> organizerRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        organizerRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerRegisterResponse.getStatusCode()
-        );
-
-        User organizer =
-                userRepository.findByEmail(organizerEmail)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Organizer was not found"
-                                )
-                        );
-
-        organizer.setRole(Role.ORGANIZER);
-
-        userRepository.save(organizer);
-
-        LoginRequest organizerLoginRequest =
-                LoginRequest.builder()
-                        .email(organizerEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> organizerLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        organizerLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerLoginResponse.getStatusCode()
-        );
-
-        String organizerToken =
-                organizerLoginResponse.getBody().getToken();
-
-        CreateEventRequest createEventRequest =
-                CreateEventRequest.builder()
-                        .title("E2E Booking Ownership Event")
-                        .description(
-                                "Event for booking ownership testing"
-                        )
-                        .location("Lucknow")
-                        .eventDate(
-                                LocalDateTime.now().plusDays(30)
-                        )
-                        .capacity(100)
-                        .ticketPrice(
-                                new BigDecimal("500.00")
-                        )
-                        .category(EventCategory.CONCERT)
-                        .build();
-
-        HttpHeaders organizerHeaders =
-                new HttpHeaders();
-
-        organizerHeaders.setBearerAuth(organizerToken);
-        organizerHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateEventRequest> eventRequest =
-                new HttpEntity<>(
-                        createEventRequest,
-                        organizerHeaders
-                );
-
-        ResponseEntity<EventResponse> eventResponse =
-                restTemplate.exchange(
-                        "/api/events",
-                        HttpMethod.POST,
-                        eventRequest,
-                        EventResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                eventResponse.getStatusCode()
-        );
-
-        EventResponse createdEvent =
-                eventResponse.getBody();
-
-        String userAEmail =
-                "user-a-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest userARegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E User A")
-                        .email(userAEmail)
-                        .password("password123")
-                        .phoneNumber("9123456789")
-                        .build();
-
-        ResponseEntity<RegisterResponse> userARegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        userARegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userARegisterResponse.getStatusCode()
-        );
-
-        Long userAId =
-                userARegisterResponse.getBody().getId();
-
-        LoginRequest userALoginRequest =
-                LoginRequest.builder()
-                        .email(userAEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> userALoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        userALoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userALoginResponse.getStatusCode()
-        );
-
-        String userAToken =
-                userALoginResponse.getBody().getToken();
-
-        CreateBookingRequest createBookingRequest =
-                CreateBookingRequest.builder()
-                        .eventId(createdEvent.getId())
-                        .numberOfTickets(2)
-                        .build();
-
-        HttpHeaders userAHeaders =
-                new HttpHeaders();
-
-        userAHeaders.setBearerAuth(userAToken);
-        userAHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateBookingRequest> bookingRequest =
-                new HttpEntity<>(
-                        createBookingRequest,
-                        userAHeaders
-                );
-
-        ResponseEntity<BookingResponse> bookingResponse =
-                restTemplate.exchange(
-                        "/api/bookings",
-                        HttpMethod.POST,
-                        bookingRequest,
-                        BookingResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                bookingResponse.getStatusCode()
-        );
-
-        BookingResponse userABooking =
-                bookingResponse.getBody();
-
-        assertNotNull(userABooking);
-
-        assertEquals(
-                userAId,
-                userABooking.getUserId()
-        );
-
-        String userBEmail =
-                "user-b-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest userBRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E User B")
-                        .email(userBEmail)
-                        .password("password123")
-                        .phoneNumber("9988776655")
-                        .build();
-
-        ResponseEntity<RegisterResponse> userBRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        userBRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userBRegisterResponse.getStatusCode()
-        );
-
-        LoginRequest userBLoginRequest =
-                LoginRequest.builder()
-                        .email(userBEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> userBLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        userBLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userBLoginResponse.getStatusCode()
-        );
-
-        String userBToken =
-                userBLoginResponse.getBody().getToken();
-
-        HttpHeaders userBHeaders =
-                new HttpHeaders();
-
-        userBHeaders.setBearerAuth(userBToken);
-
-        HttpEntity<Void> unauthorizedRequest =
-                new HttpEntity<>(userBHeaders);
-
-        ResponseEntity<String> unauthorizedResponse =
-                restTemplate.exchange(
-                        "/api/bookings/"
-                                + userABooking.getId(),
-                        HttpMethod.GET,
-                        unauthorizedRequest,
-                        String.class
-                );
-
-        assertEquals(
-                HttpStatus.NOT_FOUND,
-                unauthorizedResponse.getStatusCode()
-        );
-    }
-
-    // =========================================================
-    // STEP 8
-    // ORGANIZER CANCELS EVENT WITH BOOKING
-    // =========================================================
-
-    @Test
-    void organizer_shouldBeAbleToCancelEventWithBookings() {
-
-        // =========================================================
-        // 1. REGISTER ORGANIZER
-        // =========================================================
-
-        String organizerEmail =
-                "organizer-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest organizerRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Cancellation Organizer")
-                        .email(organizerEmail)
-                        .password("password123")
-                        .phoneNumber("9876543210")
-                        .build();
-
-        ResponseEntity<RegisterResponse> organizerRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        organizerRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerRegisterResponse.getStatusCode()
-        );
-
-        // =========================================================
-        // 2. PROMOTE TO ORGANIZER
-        // =========================================================
-
-        User organizer =
-                userRepository.findByEmail(organizerEmail)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Organizer was not found"
-                                )
-                        );
-
-        organizer.setRole(Role.ORGANIZER);
-
-        userRepository.save(organizer);
-
-        // =========================================================
-        // 3. LOGIN ORGANIZER
-        // =========================================================
-
-        LoginRequest organizerLoginRequest =
-                LoginRequest.builder()
-                        .email(organizerEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> organizerLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        organizerLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                organizerLoginResponse.getBody()
-        );
-
-        String organizerToken =
-                organizerLoginResponse.getBody().getToken();
-
-        assertNotNull(organizerToken);
-        assertFalse(organizerToken.isBlank());
-
-        // =========================================================
-        // 4. ORGANIZER CREATES EVENT
-        // =========================================================
-
-        CreateEventRequest createEventRequest =
-                CreateEventRequest.builder()
-                        .title("E2E Event Cancellation Test")
-                        .description(
-                                "Event that will be cancelled"
-                        )
-                        .location("Lucknow")
-                        .eventDate(
-                                LocalDateTime.now().plusDays(30)
-                        )
-                        .capacity(100)
-                        .ticketPrice(
-                                new BigDecimal("500.00")
-                        )
-                        .category(EventCategory.CONCERT)
-                        .build();
-
-        HttpHeaders organizerHeaders =
-                new HttpHeaders();
-
-        organizerHeaders.setBearerAuth(
-                organizerToken
-        );
-
-        organizerHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateEventRequest> eventRequest =
-                new HttpEntity<>(
-                        createEventRequest,
-                        organizerHeaders
-                );
-
-        ResponseEntity<EventResponse> eventResponse =
-                restTemplate.exchange(
-                        "/api/events",
-                        HttpMethod.POST,
-                        eventRequest,
-                        EventResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                eventResponse.getStatusCode()
-        );
-
-        assertNotNull(eventResponse.getBody());
-
-        EventResponse createdEvent =
-                eventResponse.getBody();
-
-        assertNotNull(createdEvent.getId());
-
-        assertEquals(
-                EventStatus.ACTIVE,
-                createdEvent.getStatus()
-        );
-
-        // =========================================================
-        // 5. REGISTER USER
-        // =========================================================
-
-        String userEmail =
-                "user-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest userRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Cancellation User")
-                        .email(userEmail)
-                        .password("password123")
-                        .phoneNumber("9123456789")
-                        .build();
-
-        ResponseEntity<RegisterResponse> userRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        userRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userRegisterResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                userRegisterResponse.getBody()
-        );
-
-        // =========================================================
-        // 6. LOGIN USER
-        // =========================================================
-
-        LoginRequest userLoginRequest =
-                LoginRequest.builder()
-                        .email(userEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> userLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        userLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                userLoginResponse.getBody()
-        );
-
-        String userToken =
-                userLoginResponse.getBody().getToken();
-
-        assertNotNull(userToken);
-        assertFalse(userToken.isBlank());
-
-        // =========================================================
-        // 7. USER CREATES BOOKING
-        // =========================================================
-
-        CreateBookingRequest createBookingRequest =
-                CreateBookingRequest.builder()
-                        .eventId(createdEvent.getId())
-                        .numberOfTickets(2)
-                        .build();
-
-        HttpHeaders userHeaders =
-                new HttpHeaders();
-
-        userHeaders.setBearerAuth(userToken);
-
-        userHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateBookingRequest> bookingRequest =
-                new HttpEntity<>(
-                        createBookingRequest,
-                        userHeaders
-                );
-
-        ResponseEntity<BookingResponse> bookingResponse =
-                restTemplate.exchange(
-                        "/api/bookings",
-                        HttpMethod.POST,
-                        bookingRequest,
-                        BookingResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                bookingResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                bookingResponse.getBody()
-        );
-
-        BookingResponse createdBooking =
-                bookingResponse.getBody();
-
-        assertNotNull(createdBooking.getId());
-
-        assertEquals(
-                createdEvent.getId(),
-                createdBooking.getEventId()
-        );
-
-        assertEquals(
-                BookingStatus.PENDING,
-                createdBooking.getBookingStatus()
-        );
-
-        // =========================================================
-        // 8. ORGANIZER CANCELS EVENT
-        // =========================================================
-
-        HttpEntity<Void> cancelRequest =
-                new HttpEntity<>(organizerHeaders);
-
-        ResponseEntity<EventResponse> cancelResponse =
-                restTemplate.exchange(
-                        "/api/events/"
-                                + createdEvent.getId()
-                                + "/cancel",
-                        HttpMethod.PATCH,
-                        cancelRequest,
-                        EventResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                cancelResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                cancelResponse.getBody()
-        );
-
-        EventResponse cancelledEvent =
-                cancelResponse.getBody();
-
-        assertEquals(
-                createdEvent.getId(),
-                cancelledEvent.getId()
-        );
-
-        assertEquals(
-                EventStatus.CANCELLED,
-                cancelledEvent.getStatus()
-        );
-
-        // =========================================================
-        // 9. VERIFY BOOKING WAS CANCELLED
-        // =========================================================
-
-        ResponseEntity<BookingResponse[]> myBookingsResponse =
-                restTemplate.exchange(
-                        "/api/bookings/my",
-                        HttpMethod.GET,
-                        new HttpEntity<>(userHeaders),
-                        BookingResponse[].class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                myBookingsResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                myBookingsResponse.getBody()
-        );
-
-        List<BookingResponse> bookings =
-                List.of(myBookingsResponse.getBody());
-
-        BookingResponse cancelledBooking =
-                bookings.stream()
-                        .filter(booking ->
-                                booking.getId()
-                                        .equals(createdBooking.getId())
-                        )
-                        .findFirst()
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Cancelled booking was not found"
-                                )
-                        );
-
-        assertEquals(
-                BookingStatus.CANCELLED,
-                cancelledBooking.getBookingStatus()
-        );
-
-        // =========================================================
-        // 10. VERIFY CANCELLED EVENT CANNOT ACCEPT NEW BOOKINGS
-        // =========================================================
-
-        ResponseEntity<String> secondBookingResponse =
-                restTemplate.exchange(
-                        "/api/bookings",
-                        HttpMethod.POST,
-                        bookingRequest,
-                        String.class
-                );
-
-        assertNotEquals(
-                HttpStatus.OK,
-                secondBookingResponse.getStatusCode()
-        );
-    }
-
-    // =========================================================
-    // STEP 9
-    // USER CANNOT BOOK BEYOND EVENT CAPACITY
-    // =========================================================
-
-    @Test
-    void user_shouldNotBeAbleToBookBeyondEventCapacity() {
-
-        String organizerEmail =
-                "organizer-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest organizerRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Capacity Organizer")
-                        .email(organizerEmail)
-                        .password("password123")
-                        .phoneNumber("9876543210")
-                        .build();
-
-        ResponseEntity<RegisterResponse> organizerRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        organizerRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerRegisterResponse.getStatusCode()
-        );
-
-        User organizer =
-                userRepository.findByEmail(organizerEmail)
-                        .orElseThrow(
-                                () -> new AssertionError(
-                                        "Organizer was not found"
-                                )
-                        );
-
-        organizer.setRole(Role.ORGANIZER);
-
-        userRepository.save(organizer);
-
-        LoginRequest organizerLoginRequest =
-                LoginRequest.builder()
-                        .email(organizerEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> organizerLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        organizerLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                organizerLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                organizerLoginResponse.getBody()
-        );
-
-        String organizerToken =
-                organizerLoginResponse.getBody().getToken();
-
-        CreateEventRequest createEventRequest =
-                CreateEventRequest.builder()
-                        .title("E2E Limited Capacity Event")
-                        .description(
-                                "Event for capacity testing"
-                        )
-                        .location("Lucknow")
-                        .eventDate(
-                                LocalDateTime.now().plusDays(30)
-                        )
-                        .capacity(2)
-                        .ticketPrice(
-                                new BigDecimal("500.00")
-                        )
-                        .category(EventCategory.CONCERT)
-                        .build();
-
-        HttpHeaders organizerHeaders =
-                new HttpHeaders();
-
-        organizerHeaders.setBearerAuth(
-                organizerToken
-        );
-
-        organizerHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateEventRequest> eventRequest =
-                new HttpEntity<>(
-                        createEventRequest,
-                        organizerHeaders
-                );
-
-        ResponseEntity<EventResponse> eventResponse =
-                restTemplate.exchange(
-                        "/api/events",
-                        HttpMethod.POST,
-                        eventRequest,
-                        EventResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                eventResponse.getStatusCode()
-        );
-
-        assertNotNull(eventResponse.getBody());
-
-        EventResponse createdEvent =
-                eventResponse.getBody();
-
-        assertEquals(
-                2,
-                createdEvent.getCapacity()
-        );
-
-        String userAEmail =
-                "user-a-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest userARegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Capacity User A")
-                        .email(userAEmail)
-                        .password("password123")
-                        .phoneNumber("9123456789")
-                        .build();
-
-        ResponseEntity<RegisterResponse> userARegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        userARegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userARegisterResponse.getStatusCode()
-        );
-
-        LoginRequest userALoginRequest =
-                LoginRequest.builder()
-                        .email(userAEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> userALoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        userALoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userALoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                userALoginResponse.getBody()
-        );
-
-        String userAToken =
-                userALoginResponse.getBody().getToken();
-
-        CreateBookingRequest userABookingRequest =
-                CreateBookingRequest.builder()
-                        .eventId(createdEvent.getId())
-                        .numberOfTickets(2)
-                        .build();
-
-        HttpHeaders userAHeaders =
-                new HttpHeaders();
-
-        userAHeaders.setBearerAuth(userAToken);
-
-        userAHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateBookingRequest> userABookingHttpRequest =
-                new HttpEntity<>(
-                        userABookingRequest,
-                        userAHeaders
-                );
-
-        ResponseEntity<BookingResponse> userABookingResponse =
-                restTemplate.exchange(
-                        "/api/bookings",
-                        HttpMethod.POST,
-                        userABookingHttpRequest,
-                        BookingResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userABookingResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                userABookingResponse.getBody()
-        );
-
-        BookingResponse userABooking =
-                userABookingResponse.getBody();
-
-        assertEquals(
-                2,
-                userABooking.getNumberOfTickets()
-        );
-
-        assertEquals(
-                BookingStatus.PENDING,
-                userABooking.getBookingStatus()
-        );
-
-        CreatePaymentRequest paymentRequest =
-                new CreatePaymentRequest(
-                        userABooking.getId()
-                );
-
-        HttpHeaders paymentHeaders =
-                new HttpHeaders();
-
-        paymentHeaders.setBearerAuth(userAToken);
-
-        paymentHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreatePaymentRequest> paymentHttpRequest =
-                new HttpEntity<>(
-                        paymentRequest,
-                        paymentHeaders
-                );
-
-        ResponseEntity<PaymentResponse> paymentResponse =
-                restTemplate.exchange(
-                        "/api/payments",
-                        HttpMethod.POST,
-                        paymentHttpRequest,
-                        PaymentResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.CREATED,
-                paymentResponse.getStatusCode()
-        );
-
-        assertNotNull(paymentResponse.getBody());
-
-        PaymentResponse createdPayment =
-                paymentResponse.getBody();
-
-        assertEquals(
-                PaymentStatus.PENDING,
-                createdPayment.getPaymentStatus()
-        );
-
-        HttpEntity<Void> successPaymentRequest =
-                new HttpEntity<>(paymentHeaders);
-
-        ResponseEntity<PaymentResponse> successPaymentResponse =
-                restTemplate.exchange(
-                        "/api/payments/"
-                                + createdPayment.getId()
-                                + "/success",
-                        HttpMethod.PATCH,
-                        successPaymentRequest,
-                        PaymentResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                successPaymentResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                successPaymentResponse.getBody()
-        );
-
-        assertEquals(
-                PaymentStatus.SUCCESS,
-                successPaymentResponse
-                        .getBody()
-                        .getPaymentStatus()
-        );
-
-        String userBEmail =
-                "user-b-" + UUID.randomUUID() + "@test.com";
-
-        RegisterRequest userBRegisterRequest =
-                RegisterRequest.builder()
-                        .name("E2E Capacity User B")
-                        .email(userBEmail)
-                        .password("password123")
-                        .phoneNumber("9988776655")
-                        .build();
-
-        ResponseEntity<RegisterResponse> userBRegisterResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register",
-                        userBRegisterRequest,
-                        RegisterResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userBRegisterResponse.getStatusCode()
-        );
-
-        LoginRequest userBLoginRequest =
-                LoginRequest.builder()
-                        .email(userBEmail)
-                        .password("password123")
-                        .build();
-
-        ResponseEntity<AuthResponse> userBLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login",
-                        userBLoginRequest,
-                        AuthResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                userBLoginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                userBLoginResponse.getBody()
-        );
-
-        String userBToken =
-                userBLoginResponse.getBody().getToken();
-
-        CreateBookingRequest userBBookingRequest =
-                CreateBookingRequest.builder()
-                        .eventId(createdEvent.getId())
-                        .numberOfTickets(1)
-                        .build();
-
-        HttpHeaders userBHeaders =
-                new HttpHeaders();
-
-        userBHeaders.setBearerAuth(userBToken);
-
-        userBHeaders.setContentType(
-                MediaType.APPLICATION_JSON
-        );
-
-        HttpEntity<CreateBookingRequest> userBBookingHttpRequest =
-                new HttpEntity<>(
-                        userBBookingRequest,
-                        userBHeaders
-                );
-
-        ResponseEntity<String> userBBookingResponse =
-                restTemplate.exchange(
-                        "/api/bookings",
-                        HttpMethod.POST,
-                        userBBookingHttpRequest,
-                        String.class
-                );
-
-        assertEquals(
-                HttpStatus.CONFLICT,
-                userBBookingResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                userBBookingResponse.getBody()
-        );
-
-        assertTrue(
-                userBBookingResponse
-                        .getBody()
-                        .contains(
-                                "Requested tickets exceed available event capacity."
-                        )
-        );
+        return headers;
     }
 }

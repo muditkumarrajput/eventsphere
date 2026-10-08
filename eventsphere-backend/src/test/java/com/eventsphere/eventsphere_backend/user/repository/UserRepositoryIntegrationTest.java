@@ -31,6 +31,7 @@ class UserRepositoryIntegrationTest
 
         user.setName("Test User");
         user.setEmail("test@example.com");
+        user.setPhoneNumber("9876543210");
         user.setPassword("password");
         user.setRole(Role.USER);
 
@@ -54,6 +55,7 @@ class UserRepositoryIntegrationTest
 
         user.setName("Test User");
         user.setEmail("exists@example.com");
+        user.setPhoneNumber("9876543211");
         user.setPassword("password");
         user.setRole(Role.USER);
 
@@ -79,6 +81,7 @@ class UserRepositoryIntegrationTest
 
         user1.setName("User One");
         user1.setEmail("user1@example.com");
+        user1.setPhoneNumber("9876543212");
         user1.setPassword("password");
         user1.setRole(Role.USER);
 
@@ -86,6 +89,7 @@ class UserRepositoryIntegrationTest
 
         user2.setName("User Two");
         user2.setEmail("user2@example.com");
+        user2.setPhoneNumber("9876543213");
         user2.setPassword("password");
         user2.setRole(Role.USER);
 

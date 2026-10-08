@@ -34,6 +34,7 @@ class EventRepositoryIntegrationTest
 
         organizer = new User();
         organizer.setEmail("organizer@test.com");
+        organizer.setPhoneNumber("9876543214");
         organizer.setRole(Role.ORGANIZER);
 
         organizer = userRepository.save(organizer);

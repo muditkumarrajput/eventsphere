@@ -9,6 +9,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import com.eventsphere.eventsphere_backend.common.exception.PasswordMismatchException;
+import com.eventsphere.eventsphere_backend.common.exception.UserPhoneAlreadyExistsException;
 
 import java.time.LocalDateTime;
 
@@ -384,6 +386,23 @@ public class GlobalExceptionHandler {
 
 
     // =========================================================
+    // OTP VERIFICATION
+    // =========================================================
+
+    @ExceptionHandler(OtpVerificationException.class)
+    public ResponseEntity<ErrorResponse> handleOtpVerificationException(
+            OtpVerificationException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                ex.getMessage(),
+                request
+        );
+    }
+
+
+    // =========================================================
     // GENERIC EXCEPTION
     // =========================================================
 
@@ -453,7 +472,21 @@ public class GlobalExceptionHandler {
                 request
         );
     }
+    // =========================================================
+// PASSWORD MISMATCH
+// =========================================================
 
+    @ExceptionHandler(PasswordMismatchException.class)
+    public ResponseEntity<ErrorResponse> handlePasswordMismatchException(
+            PasswordMismatchException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                ex.getMessage(),
+                request
+        );
+    }
 
 // =========================================================
 // ORGANIZER REQUEST NOT FOUND
@@ -466,6 +499,18 @@ public class GlobalExceptionHandler {
 
         return buildErrorResponse(
                 HttpStatus.NOT_FOUND,
+                ex.getMessage(),
+                request
+        );
+    }
+
+    @ExceptionHandler(UserPhoneAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleUserPhoneAlreadyExistsException(
+            UserPhoneAlreadyExistsException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.CONFLICT,
                 ex.getMessage(),
                 request
         );
