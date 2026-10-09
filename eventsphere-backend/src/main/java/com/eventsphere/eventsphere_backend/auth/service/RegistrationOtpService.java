@@ -28,7 +28,6 @@ public class RegistrationOtpService {
 
         this.pendingRegistrationRepository =
                 pendingRegistrationRepository;
-
         this.otpService = otpService;
         this.smsService = smsService;
         this.emailService = emailService;
@@ -38,24 +37,63 @@ public class RegistrationOtpService {
     public PendingRegistrationResponse sendRegistrationOtp(
             PendingRegistration pendingRegistration) {
 
-        String mobileOtp = otpService.generateOtp(
-                pendingRegistration.getPhoneNumber(),
-                OtpChannel.MOBILE,
+        String emailOtp = otpService.generateOtp(
+                pendingRegistration.getEmail(),
+                OtpChannel.EMAIL,
                 OtpPurpose.REGISTRATION
         );
 
-        smsService.sendOtp(
-                pendingRegistration.getPhoneNumber(),
-                mobileOtp,
+        emailService.sendOtp(
+                pendingRegistration.getEmail(),
+                emailOtp,
                 "Registration"
         );
 
         return PendingRegistrationResponse.builder()
-                .message(
-                        "Mobile OTP sent successfully"
-                )
-                .mobileOtpSent(true)
-                .emailOtpSent(false)
+                .message("Email OTP sent successfully")
+                .mobileOtpSent(false)
+                .emailOtpSent(true)
+                .build();
+    }
+
+    public PendingRegistrationResponse resendRegistrationOtp(
+            String email) {
+
+        String normalizedEmail = email.trim().toLowerCase();
+
+        PendingRegistration pendingRegistration =
+                pendingRegistrationRepository
+                        .findByEmail(normalizedEmail)
+                        .orElseThrow(() ->
+                                new OtpVerificationException(
+                                        "Registration request not found. Please register again."
+                                )
+                        );
+
+        validatePendingRegistration(pendingRegistration);
+
+        if (pendingRegistration.isEmailVerified()) {
+            throw new OtpVerificationException(
+                    "Email is already verified"
+            );
+        }
+
+        String emailOtp = otpService.generateOtp(
+                normalizedEmail,
+                OtpChannel.EMAIL,
+                OtpPurpose.REGISTRATION
+        );
+
+        emailService.sendOtp(
+                normalizedEmail,
+                emailOtp,
+                "Registration"
+        );
+
+        return PendingRegistrationResponse.builder()
+                .message("A new email OTP has been sent successfully")
+                .mobileOtpSent(false)
+                .emailOtpSent(true)
                 .build();
     }
 
@@ -73,9 +111,7 @@ public class RegistrationOtpService {
                                 )
                         );
 
-        validatePendingRegistration(
-                pendingRegistration
-        );
+        validatePendingRegistration(pendingRegistration);
 
         otpService.verifyOtp(
                 phoneNumber,
@@ -125,15 +161,7 @@ public class RegistrationOtpService {
                                 )
                         );
 
-        validatePendingRegistration(
-                pendingRegistration
-        );
-
-        if (!pendingRegistration.isMobileVerified()) {
-            throw new OtpVerificationException(
-                    "Mobile OTP must be verified first"
-            );
-        }
+        validatePendingRegistration(pendingRegistration);
 
         otpService.verifyOtp(
                 email,
@@ -149,9 +177,7 @@ public class RegistrationOtpService {
         );
 
         return VerifyOtpResponse.builder()
-                .message(
-                        "Email OTP verified successfully"
-                )
+                .message("Email OTP verified successfully")
                 .verified(true)
                 .nextStepRequired(false)
                 .build();
@@ -168,7 +194,7 @@ public class RegistrationOtpService {
             );
 
             throw new OtpVerificationException(
-                    "Registration request has expired"
+                    "Registration request has expired. Please register again."
             );
         }
     }

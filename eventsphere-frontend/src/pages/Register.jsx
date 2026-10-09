@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
@@ -15,12 +15,26 @@ function Register() {
         phoneNumber: "",
     });
 
-    const [mobileOtp, setMobileOtp] = useState("");
     const [emailOtp, setEmailOtp] = useState("");
+    const [resendSeconds, setResendSeconds] = useState(0);
 
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (step !== 2 || resendSeconds <= 0) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            setResendSeconds((previous) =>
+                Math.max(previous - 1, 0)
+            );
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [step, resendSeconds]);
 
     const handleChange = (event) => {
         const { name, value } = event.target;
@@ -46,70 +60,40 @@ function Register() {
             return;
         }
 
+        if (!/^[6-9]\d{9}$/.test(formData.phoneNumber.trim())) {
+            setError(
+                "Enter a valid 10-digit Indian mobile number."
+            );
+            return;
+        }
+
         setLoading(true);
 
         try {
             const response = await api.post(
                 "/auth/register",
-                formData
-            );
-
-            setMessage(
-                response.data?.message ||
-                "Mobile OTP sent successfully."
-            );
-
-            setStep(2);
-        } catch (error) {
-            console.error(
-                "Registration failed:",
-                error
-            );
-
-            setError(
-                error.response?.data?.message ||
-                "Registration failed. Please try again."
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleMobileOtpVerification = async (event) => {
-        event.preventDefault();
-
-        if (loading) {
-            return;
-        }
-
-        setMessage("");
-        setError("");
-        setLoading(true);
-
-        try {
-            const response = await api.post(
-                "/auth/register/verify-mobile",
                 {
-                    target: formData.phoneNumber,
-                    otp: mobileOtp,
+                    ...formData,
+                    name: formData.name.trim(),
+                    email: formData.email.trim().toLowerCase(),
+                    phoneNumber: formData.phoneNumber.trim(),
                 }
             );
 
             setMessage(
                 response.data?.message ||
-                "Mobile number verified. Email OTP sent."
+                "Email OTP sent successfully."
             );
 
-            setStep(3);
+            setEmailOtp("");
+            setResendSeconds(60);
+            setStep(2);
         } catch (error) {
-            console.error(
-                "Mobile OTP verification failed:",
-                error
-            );
+            console.error("Registration failed:", error);
 
             setError(
                 error.response?.data?.message ||
-                "Invalid mobile OTP. Please try again."
+                "Registration failed. Please try again."
             );
         } finally {
             setLoading(false);
@@ -125,13 +109,19 @@ function Register() {
 
         setMessage("");
         setError("");
+
+        if (!/^\d{6}$/.test(emailOtp)) {
+            setError("Enter a valid 6-digit OTP.");
+            return;
+        }
+
         setLoading(true);
 
         try {
             await api.post(
                 "/auth/register/verify-email",
                 {
-                    target: formData.email,
+                    target: formData.email.trim().toLowerCase(),
                     otp: emailOtp,
                 }
             );
@@ -151,7 +141,43 @@ function Register() {
 
             setError(
                 error.response?.data?.message ||
-                "Invalid email OTP. Please try again."
+                "Email OTP verification failed. Please try again."
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        if (loading || resendSeconds > 0) {
+            return;
+        }
+
+        setMessage("");
+        setError("");
+        setLoading(true);
+
+        try {
+            const response = await api.post(
+                "/auth/register/resend-otp",
+                {
+                    target: formData.email.trim().toLowerCase(),
+                }
+            );
+
+            setEmailOtp("");
+            setResendSeconds(60);
+
+            setMessage(
+                response.data?.message ||
+                "A new email OTP has been sent successfully."
+            );
+        } catch (error) {
+            console.error("Resending email OTP failed:", error);
+
+            setError(
+                error.response?.data?.message ||
+                "Could not resend the OTP. Please try again."
             );
         } finally {
             setLoading(false);
@@ -160,11 +186,10 @@ function Register() {
 
     return (
         <div className="auth-container">
-
             <h1>
-                {step === 1 && "Create Account"}
-                {step === 2 && "Verify Mobile Number"}
-                {step === 3 && "Verify Email"}
+                {step === 1
+                    ? "Create Account"
+                    : "Verify Email"}
             </h1>
 
             {step === 1 && (
@@ -172,7 +197,6 @@ function Register() {
                     onSubmit={handleRegister}
                     className="auth-form"
                 >
-
                     <input
                         type="text"
                         name="name"
@@ -218,46 +242,11 @@ function Register() {
                     <input
                         type="tel"
                         name="phoneNumber"
-                        placeholder="Phone Number"
+                        placeholder="10-digit Indian mobile number"
                         value={formData.phoneNumber}
                         onChange={handleChange}
-                        disabled={loading}
-                        required
-                    />
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                    >
-                        {loading
-                            ? "Sending OTP..."
-                            : "Register"}
-                    </button>
-
-                </form>
-            )}
-
-            {step === 2 && (
-                <form
-                    onSubmit={handleMobileOtpVerification}
-                    className="auth-form"
-                >
-
-                    <p>
-                        Enter the 6-digit OTP sent to your
-                        mobile number.
-                    </p>
-
-                    <input
-                        type="text"
-                        name="mobileOtp"
-                        placeholder="Mobile OTP"
-                        value={mobileOtp}
-                        onChange={(event) =>
-                            setMobileOtp(event.target.value)
-                        }
-                        maxLength={6}
-                        pattern="[0-9]{6}"
+                        pattern="[6-9][0-9]{9}"
+                        maxLength={10}
                         inputMode="numeric"
                         disabled={loading}
                         required
@@ -268,22 +257,20 @@ function Register() {
                         disabled={loading}
                     >
                         {loading
-                            ? "Verifying..."
-                            : "Verify Mobile"}
+                            ? "Sending Email OTP..."
+                            : "Register"}
                     </button>
-
                 </form>
             )}
 
-            {step === 3 && (
+            {step === 2 && (
                 <form
                     onSubmit={handleEmailOtpVerification}
                     className="auth-form"
                 >
-
                     <p>
-                        Enter the 6-digit OTP sent to your
-                        email address.
+                        Enter the 6-digit OTP sent to{" "}
+                        <strong>{formData.email}</strong>.
                     </p>
 
                     <input
@@ -292,11 +279,16 @@ function Register() {
                         placeholder="Email OTP"
                         value={emailOtp}
                         onChange={(event) =>
-                            setEmailOtp(event.target.value)
+                            setEmailOtp(
+                                event.target.value
+                                    .replace(/\D/g, "")
+                                    .slice(0, 6)
+                            )
                         }
                         maxLength={6}
                         pattern="[0-9]{6}"
                         inputMode="numeric"
+                        autoComplete="one-time-code"
                         disabled={loading}
                         required
                     />
@@ -306,10 +298,21 @@ function Register() {
                         disabled={loading}
                     >
                         {loading
-                            ? "Verifying..."
+                            ? "Please wait..."
                             : "Verify Email"}
                     </button>
 
+                    <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={loading || resendSeconds > 0}
+                    >
+                        {loading
+                            ? "Please wait..."
+                            : resendSeconds > 0
+                                ? `Resend OTP in ${resendSeconds}s`
+                                : "Resend OTP"}
+                    </button>
                 </form>
             )}
 
@@ -324,7 +327,6 @@ function Register() {
                     {error}
                 </p>
             )}
-
         </div>
     );
 }

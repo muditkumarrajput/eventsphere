@@ -6,17 +6,18 @@ import com.eventsphere.eventsphere_backend.auth.dto.LoginRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.PendingRegistrationResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterResponse;
+import com.eventsphere.eventsphere_backend.auth.dto.ResendRegistrationOtpRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.VerifyOtpRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.VerifyOtpResponse;
-import com.eventsphere.eventsphere_backend.auth.service.AuthService;
-import jakarta.validation.Valid;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 import com.eventsphere.eventsphere_backend.auth.dto.ForgotPasswordOtpResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.ForgotPasswordRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.ResetPasswordRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.ChangePasswordRequest;
+import com.eventsphere.eventsphere_backend.auth.service.AuthService;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,8 +25,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    public AuthController(
-            AuthService authService) {
+    public AuthController(AuthService authService) {
         this.authService = authService;
     }
 
@@ -35,6 +35,17 @@ public class AuthController {
 
         return ResponseEntity.ok(
                 authService.register(request)
+        );
+    }
+
+    @PostMapping("/register/resend-otp")
+    public ResponseEntity<PendingRegistrationResponse> resendRegistrationOtp(
+            @Valid @RequestBody ResendRegistrationOtpRequest request) {
+
+        return ResponseEntity.ok(
+                authService.resendRegistrationOtp(
+                        request.getTarget()
+                )
         );
     }
 
@@ -63,7 +74,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginOtpResponse> login(
+    public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request) {
 
         return ResponseEntity.ok(

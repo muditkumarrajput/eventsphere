@@ -71,34 +71,16 @@ public class AuthService {
                         .trim();
 
         if (userRepository.existsByEmail(email)
-                || pendingRegistrationRepository
-                .existsByEmail(email)) {
+                || pendingRegistrationRepository.existsByEmail(email)) {
 
-            throw new UserEmailAlreadyExistsException(
-                    email
-            );
+            throw new UserEmailAlreadyExistsException(email);
         }
 
         if (userRepository.existsByPhoneNumber(phoneNumber)
-                || pendingRegistrationRepository
-                .existsByPhoneNumber(phoneNumber)) {
+                || pendingRegistrationRepository.existsByPhoneNumber(phoneNumber)) {
 
-            throw new UserPhoneAlreadyExistsException(
-                    phoneNumber
-            );
+            throw new UserPhoneAlreadyExistsException(phoneNumber);
         }
-
-        pendingRegistrationRepository
-                .findByEmail(email)
-                .ifPresent(
-                        pendingRegistrationRepository::delete
-                );
-
-        pendingRegistrationRepository
-                .findByPhoneNumber(phoneNumber)
-                .ifPresent(
-                        pendingRegistrationRepository::delete
-                );
 
         PendingRegistration pendingRegistration =
                 PendingRegistration.builder()
@@ -110,11 +92,10 @@ public class AuthService {
                                         request.getPassword()
                                 )
                         )
-                        .mobileVerified(false)
+                        .mobileVerified(true)
                         .emailVerified(false)
                         .expiresAt(
-                                LocalDateTime.now()
-                                        .plusMinutes(10)
+                                LocalDateTime.now().plusMinutes(10)
                         )
                         .createdAt(LocalDateTime.now())
                         .build();
@@ -124,10 +105,17 @@ public class AuthService {
                         pendingRegistration
                 );
 
-        return registrationOtpService
-                .sendRegistrationOtp(
-                        savedRegistration
-                );
+        return registrationOtpService.sendRegistrationOtp(
+                savedRegistration
+        );
+    }
+
+    public PendingRegistrationResponse resendRegistrationOtp(
+            String email) {
+
+        return registrationOtpService.resendRegistrationOtp(
+                email
+        );
     }
 
     @Transactional
@@ -162,11 +150,7 @@ public class AuthService {
                         otp
                 );
 
-        if (!verificationResponse.isVerified()) {
-            throw new InvalidCredentialsException();
-        }
-
-        if (!pendingRegistration.isMobileVerified()
+        if (!verificationResponse.isVerified()
                 || !pendingRegistration.isEmailVerified()) {
 
             throw new InvalidCredentialsException();
@@ -192,14 +176,11 @@ public class AuthService {
                 .name(pendingRegistration.getName())
                 .email(pendingRegistration.getEmail())
                 .password(pendingRegistration.getPassword())
-                .phoneNumber(
-                        pendingRegistration.getPhoneNumber()
-                )
+                .phoneNumber(pendingRegistration.getPhoneNumber())
                 .role(Role.USER)
                 .build();
 
-        User savedUser =
-                userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         pendingRegistrationRepository.delete(
                 pendingRegistration
@@ -215,12 +196,11 @@ public class AuthService {
                 .build();
     }
 
-    public LoginOtpResponse login(
+    public AuthResponse login(
             LoginRequest request) {
 
         String identifier =
-                request.getIdentifier()
-                        .trim();
+                request.getIdentifier().trim();
 
         User user;
 
@@ -235,9 +215,7 @@ public class AuthService {
         } else {
 
             user = userRepository
-                    .findByEmail(
-                            identifier.toLowerCase()
-                    )
+                    .findByEmail(identifier.toLowerCase())
                     .orElseThrow(
                             InvalidCredentialsException::new
                     );
@@ -250,10 +228,14 @@ public class AuthService {
             throw new InvalidCredentialsException();
         }
 
-        return loginOtpService.sendLoginOtp(
+        String token = jwtService.generateToken(
                 user.getEmail(),
-                null
+                user.getRole()
         );
+
+        return AuthResponse.builder()
+                .token(token)
+                .build();
     }
 
     @Transactional

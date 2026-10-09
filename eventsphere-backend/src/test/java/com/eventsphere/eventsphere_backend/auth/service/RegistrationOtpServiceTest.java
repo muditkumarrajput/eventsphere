@@ -1,3 +1,4 @@
+
 package com.eventsphere.eventsphere_backend.auth.service;
 
 import com.eventsphere.eventsphere_backend.auth.dto.PendingRegistrationResponse;
@@ -38,14 +39,13 @@ class RegistrationOtpServiceTest {
     private RegistrationOtpService registrationOtpService;
 
     @Test
-    void shouldSendMobileOtpSuccessfully() {
-
+    void shouldSendEmailOtpSuccessfully() {
         PendingRegistration pendingRegistration =
                 createPendingRegistration();
 
         when(otpService.generateOtp(
-                pendingRegistration.getPhoneNumber(),
-                OtpChannel.MOBILE,
+                "test@example.com",
+                OtpChannel.EMAIL,
                 OtpPurpose.REGISTRATION
         )).thenReturn("123456");
 
@@ -55,43 +55,229 @@ class RegistrationOtpServiceTest {
                 );
 
         assertEquals(
-                "Mobile OTP sent successfully",
+                "Email OTP sent successfully",
                 response.getMessage()
         );
-
-        assertTrue(response.isMobileOtpSent());
-        assertFalse(response.isEmailOtpSent());
+        assertFalse(response.isMobileOtpSent());
+        assertTrue(response.isEmailOtpSent());
 
         verify(otpService).generateOtp(
-                pendingRegistration.getPhoneNumber(),
-                OtpChannel.MOBILE,
+                "test@example.com",
+                OtpChannel.EMAIL,
                 OtpPurpose.REGISTRATION
         );
 
-        verify(smsService).sendOtp(
-                pendingRegistration.getPhoneNumber(),
+        verify(emailService).sendOtp(
+                "test@example.com",
                 "123456",
                 "Registration"
         );
 
-        verifyNoInteractions(emailService);
+        verifyNoInteractions(smsService);
     }
 
     @Test
-    void shouldVerifyMobileOtpAndSendEmailOtp() {
-
+    void shouldResendEmailOtpSuccessfully() {
         PendingRegistration pendingRegistration =
                 createPendingRegistration();
 
-        when(
-                pendingRegistrationRepository
-                        .findByPhoneNumber("9876543210")
-        ).thenReturn(
-                Optional.of(pendingRegistration)
-        );
+        when(pendingRegistrationRepository.findByEmail(
+                "test@example.com"
+        )).thenReturn(Optional.of(pendingRegistration));
 
         when(otpService.generateOtp(
-                pendingRegistration.getEmail(),
+                "test@example.com",
+                OtpChannel.EMAIL,
+                OtpPurpose.REGISTRATION
+        )).thenReturn("654321");
+
+        PendingRegistrationResponse response =
+                registrationOtpService.resendRegistrationOtp(
+                        " TEST@example.com "
+                );
+
+        assertEquals(
+                "A new email OTP has been sent successfully",
+                response.getMessage()
+        );
+        assertFalse(response.isMobileOtpSent());
+        assertTrue(response.isEmailOtpSent());
+
+        verify(emailService).sendOtp(
+                "test@example.com",
+                "654321",
+                "Registration"
+        );
+
+        verifyNoInteractions(smsService);
+    }
+
+    @Test
+    void shouldRejectResendWhenRegistrationDoesNotExist() {
+        when(pendingRegistrationRepository.findByEmail(
+                "test@example.com"
+        )).thenReturn(Optional.empty());
+
+        OtpVerificationException exception = assertThrows(
+                OtpVerificationException.class,
+                () -> registrationOtpService.resendRegistrationOtp(
+                        "test@example.com"
+                )
+        );
+
+        assertEquals(
+                "Registration request not found. Please register again.",
+                exception.getMessage()
+        );
+
+        verifyNoInteractions(otpService);
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(smsService);
+    }
+
+    @Test
+    void shouldRejectResendWhenRegistrationHasExpired() {
+        PendingRegistration pendingRegistration =
+                createPendingRegistration();
+
+        pendingRegistration.setExpiresAt(
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        when(pendingRegistrationRepository.findByEmail(
+                "test@example.com"
+        )).thenReturn(Optional.of(pendingRegistration));
+
+        OtpVerificationException exception = assertThrows(
+                OtpVerificationException.class,
+                () -> registrationOtpService.resendRegistrationOtp(
+                        "test@example.com"
+                )
+        );
+
+        assertEquals(
+                "Registration request has expired. Please register again.",
+                exception.getMessage()
+        );
+
+        verify(pendingRegistrationRepository).delete(
+                pendingRegistration
+        );
+
+        verifyNoInteractions(otpService);
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(smsService);
+    }
+
+    @Test
+    void shouldVerifyEmailOtpWithoutMobileVerification() {
+        PendingRegistration pendingRegistration =
+                createPendingRegistration();
+
+        assertFalse(pendingRegistration.isMobileVerified());
+
+        when(pendingRegistrationRepository.findByEmail(
+                "test@example.com"
+        )).thenReturn(Optional.of(pendingRegistration));
+
+        VerifyOtpResponse response =
+                registrationOtpService.verifyEmailOtp(
+                        "test@example.com",
+                        "654321"
+                );
+
+        assertEquals(
+                "Email OTP verified successfully",
+                response.getMessage()
+        );
+        assertTrue(response.isVerified());
+        assertFalse(response.isNextStepRequired());
+        assertTrue(pendingRegistration.isEmailVerified());
+
+        verify(otpService).verifyOtp(
+                "test@example.com",
+                OtpChannel.EMAIL,
+                OtpPurpose.REGISTRATION,
+                "654321"
+        );
+
+        verify(pendingRegistrationRepository).save(
+                pendingRegistration
+        );
+
+        verifyNoInteractions(smsService);
+    }
+
+    @Test
+    void shouldRejectExpiredRegistration() {
+        PendingRegistration pendingRegistration =
+                createPendingRegistration();
+
+        pendingRegistration.setExpiresAt(
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        when(pendingRegistrationRepository.findByEmail(
+                "test@example.com"
+        )).thenReturn(Optional.of(pendingRegistration));
+
+        OtpVerificationException exception = assertThrows(
+                OtpVerificationException.class,
+                () -> registrationOtpService.verifyEmailOtp(
+                        "test@example.com",
+                        "123456"
+                )
+        );
+
+        assertEquals(
+                "Registration request has expired. Please register again.",
+                exception.getMessage()
+        );
+
+        verify(pendingRegistrationRepository).delete(
+                pendingRegistration
+        );
+
+        verifyNoInteractions(otpService);
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(smsService);
+    }
+
+    @Test
+    void shouldRejectWhenEmailRegistrationDoesNotExist() {
+        when(pendingRegistrationRepository.findByEmail(
+                "test@example.com"
+        )).thenReturn(Optional.empty());
+
+        OtpVerificationException exception = assertThrows(
+                OtpVerificationException.class,
+                () -> registrationOtpService.verifyEmailOtp(
+                        "test@example.com",
+                        "123456"
+                )
+        );
+
+        assertEquals(
+                "Registration request not found",
+                exception.getMessage()
+        );
+
+        verifyNoInteractions(otpService);
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(smsService);
+    }
+
+    @Test
+    void shouldVerifyLegacyMobileOtpAndSendEmailOtp() {
+        PendingRegistration pendingRegistration =
+                createPendingRegistration();
+
+        when(pendingRegistrationRepository.findByPhoneNumber(
+                "9876543210"
+        )).thenReturn(Optional.of(pendingRegistration));
+
+        when(otpService.generateOtp(
+                "test@example.com",
                 OtpChannel.EMAIL,
                 OtpPurpose.REGISTRATION
         )).thenReturn("654321");
@@ -106,7 +292,6 @@ class RegistrationOtpServiceTest {
                 "Mobile OTP verified. Email OTP sent successfully",
                 response.getMessage()
         );
-
         assertTrue(response.isVerified());
         assertTrue(response.isNextStepRequired());
         assertTrue(pendingRegistration.isMobileVerified());
@@ -118,162 +303,18 @@ class RegistrationOtpServiceTest {
                 "123456"
         );
 
-        verify(pendingRegistrationRepository)
-                .save(pendingRegistration);
-
-        verify(otpService).generateOtp(
-                pendingRegistration.getEmail(),
-                OtpChannel.EMAIL,
-                OtpPurpose.REGISTRATION
+        verify(pendingRegistrationRepository).save(
+                pendingRegistration
         );
 
         verify(emailService).sendOtp(
-                pendingRegistration.getEmail(),
+                "test@example.com",
                 "654321",
                 "Registration"
         );
     }
 
-    @Test
-    void shouldVerifyEmailOtpSuccessfully() {
-
-        PendingRegistration pendingRegistration =
-                createPendingRegistration();
-
-        pendingRegistration.setMobileVerified(true);
-
-        when(
-                pendingRegistrationRepository
-                        .findByEmail("test@example.com")
-        ).thenReturn(
-                Optional.of(pendingRegistration)
-        );
-
-        VerifyOtpResponse response =
-                registrationOtpService.verifyEmailOtp(
-                        "test@example.com",
-                        "654321"
-                );
-
-        assertEquals(
-                "Email OTP verified successfully",
-                response.getMessage()
-        );
-
-        assertTrue(response.isVerified());
-        assertFalse(response.isNextStepRequired());
-        assertTrue(pendingRegistration.isEmailVerified());
-
-        verify(otpService).verifyOtp(
-                "test@example.com",
-                OtpChannel.EMAIL,
-                OtpPurpose.REGISTRATION,
-                "654321"
-        );
-
-        verify(pendingRegistrationRepository)
-                .save(pendingRegistration);
-    }
-
-    @Test
-    void shouldRejectEmailOtpBeforeMobileVerification() {
-
-        PendingRegistration pendingRegistration =
-                createPendingRegistration();
-
-        when(
-                pendingRegistrationRepository
-                        .findByEmail("test@example.com")
-        ).thenReturn(
-                Optional.of(pendingRegistration)
-        );
-
-        OtpVerificationException exception =
-                assertThrows(
-                        OtpVerificationException.class,
-                        () -> registrationOtpService.verifyEmailOtp(
-                                "test@example.com",
-                                "654321"
-                        )
-                );
-
-        assertEquals(
-                "Mobile OTP must be verified first",
-                exception.getMessage()
-        );
-
-        verifyNoInteractions(otpService);
-        verifyNoInteractions(emailService);
-    }
-
-    @Test
-    void shouldRejectExpiredRegistration() {
-
-        PendingRegistration pendingRegistration =
-                createPendingRegistration();
-
-        pendingRegistration.setExpiresAt(
-                LocalDateTime.now().minusMinutes(1)
-        );
-
-        when(
-                pendingRegistrationRepository
-                        .findByPhoneNumber("9876543210")
-        ).thenReturn(
-                Optional.of(pendingRegistration)
-        );
-
-        OtpVerificationException exception =
-                assertThrows(
-                        OtpVerificationException.class,
-                        () -> registrationOtpService.verifyMobileOtp(
-                                "9876543210",
-                                "123456"
-                        )
-                );
-
-        assertEquals(
-                "Registration request has expired",
-                exception.getMessage()
-        );
-
-        verify(pendingRegistrationRepository)
-                .delete(pendingRegistration);
-
-        verifyNoInteractions(otpService);
-        verifyNoInteractions(smsService);
-        verifyNoInteractions(emailService);
-    }
-
-    @Test
-    void shouldRejectWhenRegistrationDoesNotExist() {
-
-        when(
-                pendingRegistrationRepository
-                        .findByPhoneNumber("9876543210")
-        ).thenReturn(Optional.empty());
-
-        OtpVerificationException exception =
-                assertThrows(
-                        OtpVerificationException.class,
-                        () -> registrationOtpService.verifyMobileOtp(
-                                "9876543210",
-                                "123456"
-                        )
-                );
-
-        assertEquals(
-                "Registration request not found",
-                exception.getMessage()
-        );
-
-        verifyNoInteractions(otpService);
-        verifyNoInteractions(smsService);
-        verifyNoInteractions(emailService);
-    }
-
     private PendingRegistration createPendingRegistration() {
-
         return PendingRegistration.builder()
                 .id(1L)
                 .name("John Doe")
@@ -282,9 +323,7 @@ class RegistrationOtpServiceTest {
                 .password("hashed-password")
                 .mobileVerified(false)
                 .emailVerified(false)
-                .expiresAt(
-                        LocalDateTime.now().plusMinutes(10)
-                )
+                .expiresAt(LocalDateTime.now().plusMinutes(10))
                 .createdAt(LocalDateTime.now())
                 .build();
     }

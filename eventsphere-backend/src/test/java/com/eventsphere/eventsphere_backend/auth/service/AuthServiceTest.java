@@ -2,6 +2,7 @@ package com.eventsphere.eventsphere_backend.auth.service;
 
 import com.eventsphere.eventsphere_backend.auth.dto.LoginOtpResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.LoginRequest;
+import com.eventsphere.eventsphere_backend.auth.dto.AuthResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.PendingRegistrationResponse;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterRequest;
 import com.eventsphere.eventsphere_backend.auth.dto.RegisterResponse;
@@ -432,44 +433,21 @@ class AuthServiceTest {
                 "hashed-password"
         )).thenReturn(true);
 
-        LoginOtpResponse expectedResponse =
-                LoginOtpResponse.builder()
-                        .message(
-                                "Login OTP sent successfully"
-                        )
-                        .otpSent(true)
-                        .build();
+        when(jwtService.generateToken(
+                user.getEmail(),
+                user.getRole()
+        )).thenReturn("test-jwt-token");
 
-        when(
-                loginOtpService.sendLoginOtp(
-                        user.getEmail(),
-                        null
-                )
-        ).thenReturn(expectedResponse);
-
-        LoginOtpResponse response =
-                authService.login(request);
+        AuthResponse response = authService.login(request);
 
         assertNotNull(response);
+        assertEquals("test-jwt-token", response.getToken());
 
-        assertEquals(
-                "Login OTP sent successfully",
-                response.getMessage()
-        );
+        verify(loginOtpService, never())
+                .sendLoginOtp(anyString(), any());
 
-        assertTrue(response.isOtpSent());
-
-        verify(loginOtpService)
-                .sendLoginOtp(
-                        user.getEmail(),
-                        null
-                );
-
-        verify(jwtService, never())
-                .generateToken(
-                        anyString(),
-                        any(Role.class)
-                );
+        verify(jwtService)
+                .generateToken(user.getEmail(), user.getRole());
     }
 
     @Test

@@ -929,37 +929,20 @@ class EventSphereE2ETest {
     }
 
 
+
     private RegisterResponse registerUser(
             String name,
             String email,
             String password
     ) {
 
-        String phoneNumber =
-                uniquePhoneNumber();
+        String phoneNumber = uniquePhoneNumber();
 
-        final String[] mobileOtp =
-                new String[1];
-
-        final String[] emailOtp =
-                new String[1];
+        final String[] emailOtp = new String[1];
 
         org.mockito.Mockito.doAnswer(
                 invocation -> {
-                    mobileOtp[0] =
-                            invocation.getArgument(1);
-                    return null;
-                }
-        ).when(smsService).sendOtp(
-                org.mockito.Mockito.eq(phoneNumber),
-                org.mockito.Mockito.anyString(),
-                org.mockito.Mockito.eq("Registration")
-        );
-
-        org.mockito.Mockito.doAnswer(
-                invocation -> {
-                    emailOtp[0] =
-                            invocation.getArgument(1);
+                    emailOtp[0] = invocation.getArgument(1);
                     return null;
                 }
         ).when(emailService).sendOtp(
@@ -977,8 +960,7 @@ class EventSphereE2ETest {
                         .phoneNumber(phoneNumber)
                         .build();
 
-        ResponseEntity<PendingRegistrationResponse>
-                registerResponse =
+        ResponseEntity<PendingRegistrationResponse> registerResponse =
                 restTemplate.postForEntity(
                         "/api/auth/register",
                         registerRequest,
@@ -990,42 +972,19 @@ class EventSphereE2ETest {
                 registerResponse.getStatusCode()
         );
 
-        assertNotNull(
-                registerResponse.getBody()
+        assertNotNull(registerResponse.getBody());
+
+        assertFalse(
+                registerResponse.getBody().isMobileOtpSent()
         );
 
         assertTrue(
-                registerResponse.getBody()
-                        .isMobileOtpSent()
-        );
-
-        assertFalse(
-                registerResponse.getBody()
-                        .isEmailOtpSent()
-        );
-
-        assertNotNull(mobileOtp[0]);
-
-        ResponseEntity<String>
-                mobileVerificationResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register/verify-mobile",
-                        VerifyOtpRequest.builder()
-                                .target(phoneNumber)
-                                .otp(mobileOtp[0])
-                                .build(),
-                        String.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                mobileVerificationResponse.getStatusCode()
+                registerResponse.getBody().isEmailOtpSent()
         );
 
         assertNotNull(emailOtp[0]);
 
-        ResponseEntity<RegisterResponse>
-                emailVerificationResponse =
+        ResponseEntity<RegisterResponse> emailVerificationResponse =
                 restTemplate.postForEntity(
                         "/api/auth/register/verify-email",
                         VerifyOtpRequest.builder()
@@ -1040,9 +999,7 @@ class EventSphereE2ETest {
                 emailVerificationResponse.getStatusCode()
         );
 
-        assertNotNull(
-                emailVerificationResponse.getBody()
-        );
+        assertNotNull(emailVerificationResponse.getBody());
 
         return emailVerificationResponse.getBody();
     }
@@ -1052,72 +1009,20 @@ class EventSphereE2ETest {
             String email,
             String password
     ) {
-
-        final String[] loginOtp =
-                new String[1];
-
-        org.mockito.Mockito.doAnswer(
-                invocation -> {
-                    loginOtp[0] =
-                            invocation.getArgument(1);
-                    return null;
-                }
-        ).when(emailService).sendOtp(
-                org.mockito.Mockito.eq(email),
-                org.mockito.Mockito.anyString(),
-                org.mockito.Mockito.eq("Login")
-        );
-
-        ResponseEntity<LoginOtpResponse>
-                loginResponse =
+        ResponseEntity<AuthResponse> loginResponse =
                 restTemplate.postForEntity(
                         "/api/auth/login",
                         LoginRequest.builder()
                                 .identifier(email)
                                 .password(password)
                                 .build(),
-                        LoginOtpResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                loginResponse.getStatusCode()
-        );
-
-        assertNotNull(
-                loginResponse.getBody()
-        );
-
-        assertTrue(
-                loginResponse.getBody()
-                        .isOtpSent()
-        );
-
-        assertNotNull(loginOtp[0]);
-
-        ResponseEntity<AuthResponse>
-                verifyLoginResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/login/verify-otp",
-                        VerifyOtpRequest.builder()
-                                .target(email)
-                                .otp(loginOtp[0])
-                                .build(),
                         AuthResponse.class
                 );
 
-        assertEquals(
-                HttpStatus.OK,
-                verifyLoginResponse.getStatusCode()
-        );
+        assertEquals(HttpStatus.OK, loginResponse.getStatusCode());
+        assertNotNull(loginResponse.getBody());
 
-        assertNotNull(
-                verifyLoginResponse.getBody()
-        );
-
-        String token =
-                verifyLoginResponse.getBody()
-                        .getToken();
+        String token = loginResponse.getBody().getToken();
 
         assertNotNull(token);
         assertFalse(token.isBlank());
