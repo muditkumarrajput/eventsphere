@@ -6,6 +6,7 @@ import { useAuth } from "../context/useAuth";
 function Login() {
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
 
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -153,18 +154,40 @@ function Login() {
                                 Password
                             </label>
 
-                            <input
-                                id="password"
-                                type="password"
-                                placeholder="Enter your password"
-                                value={password}
-                                onChange={(event) =>
-                                    setPassword(event.target.value)
-                                }
-                                disabled={loading}
-                                autoComplete="current-password"
-                                required
-                            />
+                            <div style={{ position: "relative" }}>
+                                <input
+                                    id="password"
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Enter your password"
+                                    value={password}
+                                    onChange={(event) =>
+                                        setPassword(event.target.value)
+                                    }
+                                    disabled={loading}
+                                    autoComplete="current-password"
+                                    required
+                                    style={{ paddingRight: "72px", width: "100%", boxSizing: "border-box" }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((visible) => !visible)}
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    aria-pressed={showPassword}
+                                    disabled={loading}
+                                    style={{
+                                        position: "absolute",
+                                        right: "10px",
+                                        top: "50%",
+                                        transform: "translateY(-50%)",
+                                        border: "none",
+                                        background: "transparent",
+                                        cursor: "pointer",
+                                        padding: "6px",
+                                    }}
+                                >
+                                    {showPassword ? "Hide" : "Show"}
+                                </button>
+                            </div>
                         </div>
 
                         {error && (
