@@ -4,7 +4,7 @@ import api from "../services/api";
 import { useAuth } from "../context/useAuth";
 
 function Login() {
-    const [email, setEmail] = useState("");
+    const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
 
     const [error, setError] = useState("");
@@ -25,7 +25,7 @@ function Login() {
 
         try {
             const response = await api.post("/auth/login", {
-                identifier: email.trim(),
+                identifier: identifier.trim(),
                 password: password,
             });
 
@@ -130,20 +130,20 @@ function Login() {
                         className="login-form"
                     >
                         <div className="login-input-group">
-                            <label htmlFor="email">
-                                Email Address
+                            <label htmlFor="identifier">
+                                Email Address or Mobile Number
                             </label>
 
                             <input
-                                id="email"
-                                type="email"
-                                placeholder="Enter your email"
-                                value={email}
+                                id="identifier"
+                                type="text"
+                                placeholder="Enter your email or 10-digit mobile number"
+                                value={identifier}
                                 onChange={(event) =>
-                                    setEmail(event.target.value)
+                                    setIdentifier(event.target.value)
                                 }
                                 disabled={loading}
-                                autoComplete="email"
+                                autoComplete="username"
                                 required
                             />
                         </div>

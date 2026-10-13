@@ -7,8 +7,6 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
 import ChangePassword from "./pages/ChangePassword";
 import Events from "./pages/Events";
 import EventDetails from "./pages/EventDetails";
@@ -53,15 +51,7 @@ function App() {
                         element={<Register />}
                     />
 
-                    <Route
-                        path="/forgot-password"
-                        element={<ForgotPassword />}
-                    />
 
-                    <Route
-                        path="/reset-password"
-                        element={<ResetPassword />}
-                    />
 
                     <Route
                         path="/events"

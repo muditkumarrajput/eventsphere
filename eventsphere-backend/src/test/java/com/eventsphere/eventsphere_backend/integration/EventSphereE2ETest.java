@@ -935,21 +935,7 @@ class EventSphereE2ETest {
             String email,
             String password
     ) {
-
         String phoneNumber = uniquePhoneNumber();
-
-        final String[] emailOtp = new String[1];
-
-        org.mockito.Mockito.doAnswer(
-                invocation -> {
-                    emailOtp[0] = invocation.getArgument(1);
-                    return null;
-                }
-        ).when(emailService).sendOtp(
-                org.mockito.Mockito.eq(email),
-                org.mockito.Mockito.anyString(),
-                org.mockito.Mockito.eq("Registration")
-        );
 
         RegisterRequest registerRequest =
                 RegisterRequest.builder()
@@ -960,48 +946,17 @@ class EventSphereE2ETest {
                         .phoneNumber(phoneNumber)
                         .build();
 
-        ResponseEntity<PendingRegistrationResponse> registerResponse =
+        ResponseEntity<RegisterResponse> registerResponse =
                 restTemplate.postForEntity(
                         "/api/auth/register",
                         registerRequest,
-                        PendingRegistrationResponse.class
-                );
-
-        assertEquals(
-                HttpStatus.OK,
-                registerResponse.getStatusCode()
-        );
-
-        assertNotNull(registerResponse.getBody());
-
-        assertFalse(
-                registerResponse.getBody().isMobileOtpSent()
-        );
-
-        assertTrue(
-                registerResponse.getBody().isEmailOtpSent()
-        );
-
-        assertNotNull(emailOtp[0]);
-
-        ResponseEntity<RegisterResponse> emailVerificationResponse =
-                restTemplate.postForEntity(
-                        "/api/auth/register/verify-email",
-                        VerifyOtpRequest.builder()
-                                .target(email)
-                                .otp(emailOtp[0])
-                                .build(),
                         RegisterResponse.class
                 );
 
-        assertEquals(
-                HttpStatus.OK,
-                emailVerificationResponse.getStatusCode()
-        );
+        assertEquals(HttpStatus.OK, registerResponse.getStatusCode());
+        assertNotNull(registerResponse.getBody());
 
-        assertNotNull(emailVerificationResponse.getBody());
-
-        return emailVerificationResponse.getBody();
+        return registerResponse.getBody();
     }
 
 

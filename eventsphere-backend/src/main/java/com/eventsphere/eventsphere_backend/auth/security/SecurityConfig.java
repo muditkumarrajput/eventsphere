@@ -100,6 +100,13 @@ public class SecurityConfig {
                         // -------------------------------------------------
                         // Public Authentication APIs
                         // -------------------------------------------------
+                        // Password changes require an authenticated user.
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/change-password"
+                        ).authenticated()
+
+                        // Remaining authentication endpoints are public.
                         .requestMatchers(
                                 "/api/auth/**"
                         ).permitAll()

@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
 function Register() {
     const navigate = useNavigate();
-
-    const [step, setStep] = useState(1);
 
     const [formData, setFormData] = useState({
         name: "",
@@ -15,26 +14,11 @@ function Register() {
         phoneNumber: "",
     });
 
-    const [emailOtp, setEmailOtp] = useState("");
-    const [resendSeconds, setResendSeconds] = useState(0);
-
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        if (step !== 2 || resendSeconds <= 0) {
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            setResendSeconds((previous) =>
-                Math.max(previous - 1, 0)
-            );
-        }, 1000);
-
-        return () => clearTimeout(timer);
-    }, [step, resendSeconds]);
 
     const handleChange = (event) => {
         const { name, value } = event.target;
@@ -48,46 +32,51 @@ function Register() {
     const handleRegister = async (event) => {
         event.preventDefault();
 
-        if (loading) {
-            return;
-        }
+        if (loading) return;
 
         setMessage("");
         setError("");
+
+        const name = formData.name.trim();
+        const email = formData.email.trim().toLowerCase();
+        const phoneNumber = formData.phoneNumber.trim();
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            setError("Enter a valid email address.");
+            return;
+        }
+
+        if (!/^[6-9]\d{9}$/.test(phoneNumber)) {
+            setError("Enter a valid 10-digit Indian mobile number.");
+            return;
+        }
+
+        if (formData.password.length < 8) {
+            setError("Password must contain at least 8 characters.");
+            return;
+        }
 
         if (formData.password !== formData.confirmPassword) {
             setError("Passwords do not match.");
             return;
         }
 
-        if (!/^[6-9]\d{9}$/.test(formData.phoneNumber.trim())) {
-            setError(
-                "Enter a valid 10-digit Indian mobile number."
-            );
-            return;
-        }
-
         setLoading(true);
 
         try {
-            const response = await api.post(
-                "/auth/register",
-                {
-                    ...formData,
-                    name: formData.name.trim(),
-                    email: formData.email.trim().toLowerCase(),
-                    phoneNumber: formData.phoneNumber.trim(),
-                }
-            );
+            await api.post("/auth/register", {
+                name,
+                email,
+                phoneNumber,
+                password: formData.password,
+                confirmPassword: formData.confirmPassword,
+            });
 
-            setMessage(
-                response.data?.message ||
-                "Email OTP sent successfully."
-            );
+            setMessage("Registration successful! Redirecting to login...");
 
-            setEmailOtp("");
-            setResendSeconds(60);
-            setStep(2);
+            setTimeout(() => {
+                navigate("/login");
+            }, 1200);
         } catch (error) {
             console.error("Registration failed:", error);
 
@@ -100,232 +89,135 @@ function Register() {
         }
     };
 
-    const handleEmailOtpVerification = async (event) => {
-        event.preventDefault();
-
-        if (loading) {
-            return;
-        }
-
-        setMessage("");
-        setError("");
-
-        if (!/^\d{6}$/.test(emailOtp)) {
-            setError("Enter a valid 6-digit OTP.");
-            return;
-        }
-
-        setLoading(true);
-
-        try {
-            await api.post(
-                "/auth/register/verify-email",
-                {
-                    target: formData.email.trim().toLowerCase(),
-                    otp: emailOtp,
-                }
-            );
-
-            setMessage(
-                "Registration successful! Redirecting to login..."
-            );
-
-            setTimeout(() => {
-                navigate("/login");
-            }, 1500);
-        } catch (error) {
-            console.error(
-                "Email OTP verification failed:",
-                error
-            );
-
-            setError(
-                error.response?.data?.message ||
-                "Email OTP verification failed. Please try again."
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleResendOtp = async () => {
-        if (loading || resendSeconds > 0) {
-            return;
-        }
-
-        setMessage("");
-        setError("");
-        setLoading(true);
-
-        try {
-            const response = await api.post(
-                "/auth/register/resend-otp",
-                {
-                    target: formData.email.trim().toLowerCase(),
-                }
-            );
-
-            setEmailOtp("");
-            setResendSeconds(60);
-
-            setMessage(
-                response.data?.message ||
-                "A new email OTP has been sent successfully."
-            );
-        } catch (error) {
-            console.error("Resending email OTP failed:", error);
-
-            setError(
-                error.response?.data?.message ||
-                "Could not resend the OTP. Please try again."
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
     return (
         <div className="auth-container">
-            <h1>
-                {step === 1
-                    ? "Create Account"
-                    : "Verify Email"}
-            </h1>
+            <h1>Create Account</h1>
 
-            {step === 1 && (
-                <form
-                    onSubmit={handleRegister}
-                    className="auth-form"
-                >
-                    <input
-                        type="text"
-                        name="name"
-                        placeholder="Name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        disabled={loading}
-                        required
-                    />
+            <form onSubmit={handleRegister} className="auth-form">
+                <input
+                    type="text"
+                    name="name"
+                    placeholder="Name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    autoComplete="name"
+                    disabled={loading}
+                    required
+                />
 
-                    <input
-                        type="email"
-                        name="email"
-                        placeholder="Email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        disabled={loading}
-                        required
-                    />
+                <input
+                    type="email"
+                    name="email"
+                    placeholder="Email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    autoComplete="email"
+                    disabled={loading}
+                    required
+                />
 
+                <div style={{ position: "relative", width: "100%" }}>
                     <input
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         name="password"
-                        placeholder="Password"
+                        placeholder="Password (minimum 8 characters)"
                         value={formData.password}
                         onChange={handleChange}
+                        autoComplete="new-password"
                         minLength={8}
+                        style={{ width: "100%", boxSizing: "border-box", paddingRight: "48px" }}
                         disabled={loading}
                         required
                     />
 
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword((previous) => !previous)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        title={showPassword ? "Hide password" : "Show password"}
+                        style={{
+                            position: "absolute",
+                            right: "8px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            padding: "6px",
+                        }}
+                    >
+                        {showPassword ? "🙈" : "👁️"}
+                    </button>
+                </div>
+
+                <div style={{ position: "relative", width: "100%" }}>
                     <input
-                        type="password"
+                        type={showConfirmPassword ? "text" : "password"}
                         name="confirmPassword"
                         placeholder="Confirm Password"
                         value={formData.confirmPassword}
                         onChange={handleChange}
+                        autoComplete="new-password"
                         minLength={8}
+                        style={{ width: "100%", boxSizing: "border-box", paddingRight: "48px" }}
                         disabled={loading}
                         required
                     />
-
-                    <input
-                        type="tel"
-                        name="phoneNumber"
-                        placeholder="10-digit Indian mobile number"
-                        value={formData.phoneNumber}
-                        onChange={handleChange}
-                        pattern="[6-9][0-9]{9}"
-                        maxLength={10}
-                        inputMode="numeric"
-                        disabled={loading}
-                        required
-                    />
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                    >
-                        {loading
-                            ? "Sending Email OTP..."
-                            : "Register"}
-                    </button>
-                </form>
-            )}
-
-            {step === 2 && (
-                <form
-                    onSubmit={handleEmailOtpVerification}
-                    className="auth-form"
-                >
-                    <p>
-                        Enter the 6-digit OTP sent to{" "}
-                        <strong>{formData.email}</strong>.
-                    </p>
-
-                    <input
-                        type="text"
-                        name="emailOtp"
-                        placeholder="Email OTP"
-                        value={emailOtp}
-                        onChange={(event) =>
-                            setEmailOtp(
-                                event.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 6)
-                            )
-                        }
-                        maxLength={6}
-                        pattern="[0-9]{6}"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        disabled={loading}
-                        required
-                    />
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                    >
-                        {loading
-                            ? "Please wait..."
-                            : "Verify Email"}
-                    </button>
 
                     <button
                         type="button"
-                        onClick={handleResendOtp}
-                        disabled={loading || resendSeconds > 0}
+                        onClick={() => setShowConfirmPassword((previous) => !previous)}
+                        aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                        title={showConfirmPassword ? "Hide password" : "Show password"}
+                        style={{
+                            position: "absolute",
+                            right: "8px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            padding: "6px",
+                        }}
                     >
-                        {loading
-                            ? "Please wait..."
-                            : resendSeconds > 0
-                                ? `Resend OTP in ${resendSeconds}s`
-                                : "Resend OTP"}
+                        {showConfirmPassword ? "🙈" : "👁️"}
                     </button>
-                </form>
-            )}
+                </div>
+
+                <input
+                    type="tel"
+                    name="phoneNumber"
+                    placeholder="10-digit Indian mobile number"
+                    value={formData.phoneNumber}
+                    onChange={(event) => {
+                        const value = event.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 10);
+
+                        setFormData((previous) => ({
+                            ...previous,
+                            phoneNumber: value,
+                        }));
+                    }}
+                    pattern="[6-9][0-9]{9}"
+                    maxLength={10}
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    disabled={loading}
+                    required
+                />
+
+                <button type="submit" disabled={loading}>
+                    {loading ? "Creating Account..." : "Register"}
+                </button>
+            </form>
 
             {message && (
-                <p className="success-message">
-                    {message}
-                </p>
+                <p className="success-message">{message}</p>
             )}
 
             {error && (
-                <p className="error-message">
-                    {error}
-                </p>
+                <p className="error-message">{error}</p>
             )}
         </div>
     );
